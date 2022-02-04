@@ -1,7 +1,7 @@
 [meta]
 name     = "Best Checkpoints"
 author   = "MostlyADuck"
-category = "Testing"
+category = "Race"
 
 [script]
 imports = [ "Formatting.as", "Time.as" ]
