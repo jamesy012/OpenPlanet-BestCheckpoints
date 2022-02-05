@@ -2,6 +2,9 @@
 [Setting category="Display Settings" name="Window visible" description="To adjust the position of the window, click and drag while the Openplanet overlay is visible."]
 bool windowVisible = true;
 
+[Setting category="Display Settings" name="Hide on hidden interface"]
+bool hideWithIFace = false;
+
 [Setting category="Display Settings" name="Window position"]
 vec2 anchor = vec2(0, 780);
 
@@ -17,11 +20,17 @@ int fontSize = 16;
 [Setting category="Options" name="Save on run complete" description="Only stores/updates best times when a run is finished."]
 bool saveWhenCompleted = false;
 
-[Setting category="Options" name="Reset Data for Map" description="this will clear the best times for this map"]
-bool resetMapData = false;
+[Setting category="Options" name="Show window title" description="Adds a title to the top of the window"]
+bool showTitle = true;
 
 [Setting category="Options" name="Show theoretical best" description="Adds theoretical best time to the end of the window headder"]
 bool showTheoreticalBest = true;
+
+[Setting category="Options" name="Save on disk" description="Stops saving data to disk - When this is enabled you will be able to load old data"]
+bool saveData = true;
+
+[Setting category="Options" name="Reset Data for Map" description="this will clear the best times for this map (does not delete file)"]
+bool resetMapData = false;
 
 //timing
 int startTime = 0;
@@ -102,7 +111,7 @@ void Update(float dt) {
         }
     }
 
-    //extra reset
+    //fileio reset
     if(resetMapData){
         resetMapData = false;
         waitForCarReset = true;
@@ -345,7 +354,7 @@ int GetStartCheckpoint() {
 }
 
 void UpdateWaypoints() {
-    numCps = 0;
+    numCps = 1;//one for finish
     isMultiLap = false;
 
     array < int > links = {};
@@ -365,7 +374,7 @@ void UpdateWaypoints() {
             continue;
         }
         if (landmarks[i].Waypoint.IsFinish) {
-            numCps++;
+            //numCps++;
             continue;
         }
         //if(landmarks[i].Tag == "Spawn"){
@@ -449,6 +458,12 @@ void LoadFile() {
 void SaveFile() {
     firstLoad = false;
 
+    if (saveData == false) {
+        return;
+    }
+
+    jsonData = Json::Object();
+
     jsonData["version"] = jsonVersion;
     //jsonData["times"] = bestTimes;
     jsonData["size"] = bestTimes.Length;
@@ -470,14 +485,9 @@ void Render() {
 #endif
 
     bool hideWithIFace = false;
-    bool showMapName = true;
-    bool showAuthorName = false;
-    bool showMedalIcons = true;
-    bool showPbestDelta = false;
-    bool showHeader = true;
+
     int timeWidth = 53;
     int deltaWidth = 60;
-    bool showComment = true;
 
     if (hideWithIFace) {
         auto playground = app.CurrentPlayground;
@@ -506,60 +516,46 @@ void Render() {
             anchor = UI::GetWindowPos();
         }
 
-        bool hasComment = string(map.MapInfo.Comments).Length > 0;
-
         UI::BeginGroup();
-        if ((showMapName || showAuthorName) && UI::BeginTable("header", 1, UI::TableFlags::SizingFixedFit)) {
-            if (showMapName) {
-                UI::TableNextRow();
-                UI::TableNextColumn();
-                //UI::Text("Best CP " + playerStartTime + " " + IsWaypointStart(GetCurrentCheckpoint()) + " - " + waitForCarReset);
-                //UI::Text("Best CP " + GetMapName() + " " + GetMapId() + " " + waitForCarReset + " " + lastCP+"/"+GetCurrentCheckpoint());
 
-                string theoreticalString = "";
+        bool shouldShowTheoretical = showTheoreticalBest && isMultiLap == false && int(bestTimes.Length) == numCps;
+        if ((showTitle || shouldShowTheoretical) && UI::BeginTable("header", 1, UI::TableFlags::SizingFixedFit)) {
+            string headerText = "";
+            if (showTitle) {
+                headerText += "Best CP";
+            }
+            UI::TableNextRow();
+            UI::TableNextColumn();
+            //UI::Text("Best CP " + playerStartTime + " " + IsWaypointStart(GetCurrentCheckpoint()) + " - " + waitForCarReset);
+            //UI::Text("Best CP " + GetMapName() + " " + GetMapId() + " " + waitForCarReset + " " + lastCP+"/"+GetCurrentCheckpoint());
 
-                if (showTheoreticalBest && isMultiLap == false && int(bestTimes.Length) == numCps) {
-                    int theoreticalBest = 0;
-                    for (uint i = 0; i < bestTimes.Length; i++) {
-                        //if we have finished then grab the best of both times
-                        //this is possibly bad, maybe only grab the lowest time anyway>
-                        if (isFinished) {
-                            theoreticalBest += GetLowestTime(i);
-                        } else {
-                            theoreticalBest += bestTimes[i];
-                        }
+
+            if (shouldShowTheoretical) {
+                int theoreticalBest = 0;
+                for (uint i = 0; i < bestTimes.Length; i++) {
+                    //if we have finished then grab the best of both times
+                    //this is possibly bad, maybe only grab the lowest time anyway>
+                    if (isFinished) {
+                        theoreticalBest += GetLowestTime(i);
+                    } else {
+                        theoreticalBest += bestTimes[i];
                     }
-                    theoreticalString = "~" + Time::Format(theoreticalBest);
                 }
+                headerText += " ~" + Time::Format(theoreticalBest);
+            }
 
-                UI::Text("Best CP " + theoreticalString);
-                //#if TURBO
-                //				UI::Text((campaignMap ? "#" : "") + StripFormatCodes(map.MapInfo.Name) + (hasComment && !showAuthorName ? " \\$68f" + Icons::InfoCircle : ""));
-                //#else
-                //				UI::Text(StripFormatCodes(map.MapInfo.Name) + (hasComment && !showAuthorName ? " \\$68f" + Icons::InfoCircle : ""));
-                //#endif
-            }
-            if (showAuthorName) {
-                UI::TableNextRow();
-                UI::TableNextColumn();
-                //UI::Text("\\$888by " + map.MapInfo.AuthorNickName + (hasComment ? " \\$68f" + Icons::InfoCircle : ""));
-                UI::Text("\\$888by " + map.MapInfo.AuthorNickName);
-            }
+
+            UI::Text(headerText);
+
             UI::EndTable();
         }
 
-        int numCols = 3; // name and time columns are always shown
-        if (showMedalIcons) numCols++;
-        if (showPbestDelta) numCols++;
+        int numCols = 4; 
 
         if (UI::BeginTable("table", numCols, UI::TableFlags::SizingFixedFit)) {
-            if (showHeader) {
+            //if (showHeader) {
+            {
                 UI::TableNextRow();
-
-                //if (showMedalIcons) {
-                //	UI::TableNextColumn();
-                //	// Medal icon has no header text
-                //}
 
                 UI::TableNextColumn();
                 SetMinWidth(0);
@@ -579,22 +575,25 @@ void Render() {
             }
 
             for (uint i = 0; i < bestTimes.Length; i++) {
-                //if(times[i].hidden) {
-                //	continue;
-                //}
+
                 UI::TableNextRow();
 
+                //CP
                 UI::TableNextColumn();
                 UI::Text("" + (i + 1));
 
+                //Best
                 UI::TableNextColumn();
                 UI::Text(Time::Format(bestTimes[i]));
-                //UI::Text(getTimeString(bestTimes[i]));
 
+
+                //Current/Delta
                 if (currTimes.Length > i) {
+                    //Current
                     UI::TableNextColumn();
                     UI::Text(Time::Format(currTimes[i]));
-                    //UI::Text(getTimeString(currTimes[i]));  
+
+                    //Delta
                     UI::TableNextColumn();
                     int delta = currTimes[i] - bestTimes[i];
                     if (delta > 0) {
@@ -607,35 +606,11 @@ void Render() {
                     UI::PopStyleColor();
                 }
 
-
-                //if(showMedalIcons) {
-                //	UI::TableNextColumn();
-                //	times[i].DrawIcon();
-                //}
-                //
-                //UI::TableNextColumn();
-                //times[i].DrawName();
-                //
-                //UI::TableNextColumn();
-                //times[i].DrawTime();
-
-                //if (showPbestDelta) {
-                //	UI::TableNextColumn();
-                //	times[i].DrawDelta(pbest);
-                //}
             }
 
             UI::EndTable();
         }
         UI::EndGroup();
-
-        if (hasComment && showComment && UI::IsItemHovered()) {
-            UI::BeginTooltip();
-            UI::PushTextWrapPos(200);
-            UI::TextWrapped(map.MapInfo.Comments);
-            UI::PopTextWrapPos();
-            UI::EndTooltip();
-        }
 
         UI::End();
 
