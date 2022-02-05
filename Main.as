@@ -26,10 +26,10 @@ bool showTitle = true;
 [Setting category="Options" name="Show theoretical best" description="Adds theoretical best time to the end of the window headder"]
 bool showTheoreticalBest = true;
 
-[Setting category="Options" name="Save on disk" description="Stops saving data to disk - When this is enabled you will be able to load old data"]
+[Setting category="Options" name="Save on disk" description="Stops saving data to disk - When this is disabled you will be able to load old data"]
 bool saveData = true;
 
-[Setting category="Options" name="Reset Data for Map" description="this will clear the best times for this map (does not delete file)"]
+[Setting category="Options" name="Reset Data for Map" description="This will clear the best times for this map (does not delete file)"]
 bool resetMapData = false;
 
 //timing
@@ -478,13 +478,12 @@ void SaveFile() {
 void Render() {
     auto app = cast < CTrackMania > (GetApp());
 
-#if TMNEXT || MP4
+//#if TMNEXT || MP4
     auto map = app.RootMap;
-#elif TURBO
-    auto map = app.Challenge;
-#endif
+//#elif TURBO
+//    auto map = app.Challenge;
+//#endif
 
-    bool hideWithIFace = false;
 
     int timeWidth = 53;
     int deltaWidth = 60;
