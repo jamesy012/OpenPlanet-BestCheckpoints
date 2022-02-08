@@ -33,7 +33,6 @@ bool saveData = true;
 bool resetMapData = false;
 
 //timing
-int startTime = 0;
 int lastCpTime = 0;
 int lastCP = 0;
 
@@ -80,22 +79,37 @@ void Main() {
     //currentMap = GetMapId();
 }
 
-void Update(float dt) {
+//clears data, waits till a reset to start happens
+void ResetCommon() {
+    waitForCarReset = true;
+    ResetRace();
+    bestTimes = {};
+    jsonData = Json::Object();
+}
 
+void ResetRace() {
+    currTimes = {};
+    isFinished = false;
+    lastCP = GetSpawnCheckpoint();
+    lastCpTime = 0;
+}
+
+void Update(float dt) {
     //have we changed map?
     if (currentMap != GetMapId()) {
         DebugText("map mismatch");
 
         //we have left the map, lets save our data before we lose it
-        if(currentMap != ""){
+        if (currentMap != "") {
             UpdateSaveBestData();
         }
 
+        //reset file names
+        jsonFile = "";
+        currentMap = "";
+
         //reset important variables
-        waitForCarReset = true;
-        bestTimes = {};
-        currTimes = {};
-        jsonData = Json::Object();
+        ResetCommon();
 
         //check for a valid map
         if (currentMap == "" || GetMapId() == "") {
@@ -112,86 +126,81 @@ void Update(float dt) {
     }
 
     //fileio reset
-    if(resetMapData){
+    if (resetMapData) {
         resetMapData = false;
-        waitForCarReset = true;
-        bestTimes = {};
-        currTimes = {};
-        jsonData = Json::Object();
+
+        ResetCommon();
+
         SaveFile();
     }
 
     //wait for the car to be back at starting checkpoint
     if (waitForCarReset) {
-        waitForCarReset = !IsWaypointStart(GetCurrentCheckpoint());
+        //when waiting for a reset, this will be the last value used (ie finish time)
+        //during a reset it's set to a random negative value
+        waitForCarReset = GetPlayerStartTime() >= 0;
+        //waitForCarReset = !IsWaypointStart(GetCurrentCheckpoint());
         playerStartTime = GetPlayerStartTime();
         return;
     }
 
     //wait for car to be driveable to do our final reset
-    if (resetData && IsCarDriveable()) {
-        DebugText("running reset");
-        resetData = false;
-        isFinished = false;
+    if (resetData) {
+        if (IsPlayerReady()) {
+            DebugText("Running reset");
+            resetData = false;
 
-        //playerStartTime = GetPlayerStartTime();
-        startTime = Time::get_Now();
+            UpdateSaveBestData();
 
-        lastCP = GetStartCheckpoint();
-        lastCpTime = 0;
+            ResetRace();
 
-        
-        if(numCps == 0){
-            UpdateWaypoints();
+
+            //playerStartTime = GetPlayerStartTime();
+            playerStartTime = GetActualPlayerStartTime();
+
+            if (numCps == 0) {
+                UpdateWaypoints();
+            }
+
+            DebugText("Ready to read checkpoints");
         }
-
-        UpdateSaveBestData();
-
-        currTimes = {};
+        return;
+    } else {
+        //if our car no longer became valid? reset?
+        if (!IsPlayerReady()) {
+            DebugText("Car no longer valid..");
+            resetData = true;
+            return;
+        }
     }
-
 
     int cp = GetCurrentCheckpoint();
 
     //have we changed checkpoint?
-    if ((Time::get_Now() - startTime) > 0 && cp != lastCP) {
-        //check if something went wrong with the player
-        if (playerStartTime != GetPlayerStartTime()) {
-            DebugTextChecked("failed  playerStartTime- " + playerStartTime + " != " + GetPlayerStartTime());
+    if (cp != lastCP) {
+        DebugText("Checkpoint change " + lastCP + "/" + cp);
+
+        lastCP = cp;
+
+        int raceTime = GetPlayerRaceTime();
+
+        int deltaTime = raceTime - lastCpTime;
+        lastCpTime = raceTime;
+
+        //make sure bestTimes keeps up with the currTimes array
+        if (bestTimes.Length <= currTimes.Length) {
+            bestTimes.InsertLast(deltaTime);
+        }
+
+        //add our time
+        currTimes.InsertLast(deltaTime);
+
+        //check for finish
+        if (IsWaypointFinish(cp)) {
+            DebugTextChecked("Race Finished");
             waitForCarReset = true;
             resetData = true;
-            return;
-        }
-
-        //check if this is a checkpoint we care about
-        bool validWaypoint = IsWaypointValid(cp);
-        if (cp != GetStartCheckpoint()) {
-            DebugTextChecked("waypoint not valid - " + validWaypoint + " - " + cp + "/" + lastCP);
-        }
-
-        if (validWaypoint) {
-            DebugTextChecked("adding time");
-            lastCP = cp;
-
-            int raceTime = Time::get_Now() - startTime;
-
-            int deltaTime = raceTime - lastCpTime;
-            lastCpTime = raceTime;
-
-            //make sure bestTimes keeps up with the currTimes array
-            if (bestTimes.Length <= currTimes.Length) {
-                bestTimes.InsertLast(deltaTime);
-            }
-
-            //add our time
-            currTimes.InsertLast(deltaTime);
-
-            //check for finish
-            if(IsWaypointFinish(cp)){
-                waitForCarReset = true;
-                resetData = true;
-                isFinished = true;
-            }
+            isFinished = true;
         }
 
     }
@@ -234,7 +243,7 @@ int GetLowestTime(uint checkpoint) {
     return -1;
 }
 
-CSmPlayer @ GetPlayer() {
+CSmPlayer@ GetPlayer() {
     auto playground = GetApp().CurrentPlayground;
     if (playground is null || playground.GameTerminals.Length != 1) {
         return null;
@@ -242,50 +251,66 @@ CSmPlayer @ GetPlayer() {
     return cast < CSmPlayer > (playground.GameTerminals[0].GUIPlayer);
 }
 
-CSmScriptPlayer @ GetPlayerScript() {
-    CSmPlayer @ smPlayer = GetPlayer();
+CSmScriptPlayer@ GetPlayerScript() {
+    CSmPlayer@ smPlayer = GetPlayer();
     if (smPlayer is null) {
         return null;
     }
     return smPlayer.ScriptAPI;
 }
 
-bool IsCarDriveable() {
-    CSmScriptPlayer @ smPlayerScript = GetPlayerScript();
+bool IsPlayerReady() {
+    CSmScriptPlayer@ smPlayerScript = GetPlayerScript();
     if (smPlayerScript is null) {
         return false;
     }
-    return smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver;
+    return smPlayerScript.CurrentRaceTime >= 0 && smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver && GetSpawnCheckpoint() != -1;
+}
+
+int GetPlayerRaceTime() {
+    CSmScriptPlayer@ smPlayerScript = GetPlayerScript();
+    if (smPlayerScript is null) {
+        return -1;
+    }
+    return smPlayerScript.CurrentRaceTime;
 }
 
 int GetPlayerStartTime() {
-    CSmPlayer @ smPlayer = GetPlayer();
+    CSmPlayer@ smPlayer = GetPlayer();
     if (smPlayer is null) {
         return -1;
     }
     return smPlayer.StartTime;
 }
 
+int GetActualPlayerStartTime() {
+    CSmScriptPlayer@ smPlayerScript = GetPlayerScript();
+    if (smPlayerScript is null) {
+        return -1;
+    }
+    return smPlayerScript.StartTime - smPlayerScript.CurrentRaceTime;
+}
+
 
 int GetCurrentCheckpoint() {
-    CSmPlayer @ smPlayer = GetPlayer();
+    CSmPlayer@ smPlayer = GetPlayer();
     if (smPlayer is null) {
         return -1;
     }
     return smPlayer.CurrentLaunchedRespawnLandmarkIndex;
 }
 
-string GetMapName(){
-    CSmArenaClient@ playground = cast<CSmArenaClient>(GetApp().CurrentPlayground);
-    if(playground is null || playground.Map is null){
+string GetMapName() {
+    CSmArenaClient@ playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    if (playground is null || playground.Map is null) {
         return "";
     }
     return playground.Map.MapName;
 }
 
-string GetMapId(){
-    CSmArenaClient@ playground = cast<CSmArenaClient>(GetApp().CurrentPlayground);
-    if(playground is null || playground.Map is null){
+string GetMapId() {
+    CSmArenaClient@ playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    if (playground is null || playground.Map is null) {
         return "";
     }
     return playground.Map.IdName;
@@ -296,81 +321,63 @@ bool IsWaypointFinish(int index) {
         return false;
     }
     auto playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
-    MwFastBuffer < CGameScriptMapLandmark @ > landmarks = playground.Arena.MapLandmarks;
+    MwFastBuffer < CGameScriptMapLandmark@ > landmarks = playground.Arena.MapLandmarks;
     if (index >= int(landmarks.Length)) {
         return false;
     }
-    return landmarks[index].Waypoint !is null ? landmarks[index].Waypoint.IsFinish : false;
+    return landmarks[index].Waypoint!is null ? landmarks[index].Waypoint.IsFinish : false;
 }
 
 bool IsWaypointStart(int index) {
-    if(index == -1){
-        return false;
-    }
-    auto playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
-    MwFastBuffer < CGameScriptMapLandmark @ > landmarks = playground.Arena.MapLandmarks;
-
-    if(index >= int(landmarks.Length)){
-        return false;
-    }
-
-    return landmarks[index].Tag == "Spawn";
+    return GetSpawnCheckpoint() == index;
 }
 
 
 bool IsWaypointValid(int index) {
-    if(index == -1){
+    if (index == -1) {
         return false;
     }
     auto playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
-    MwFastBuffer < CGameScriptMapLandmark @ > landmarks = playground.Arena.MapLandmarks;
-    if(index >= int(landmarks.Length)){
+    MwFastBuffer < CGameScriptMapLandmark@ > landmarks = playground.Arena.MapLandmarks;
+    if (index >= int(landmarks.Length)) {
         return false;
     }
     bool valid = false;
     //valid |= (landmarks[index].Waypoint != null ? landmarks[index].Waypoint.IsFinish : false);
     //valid |= (landmarks[index].Tag == "Checkpoint");
-    if (landmarks[index].Waypoint !is null ? landmarks[index].Waypoint.IsFinish : false)
+    if (landmarks[index].Waypoint!is null ? landmarks[index].Waypoint.IsFinish : false)
         valid = true;
     if ((landmarks[index].Tag == "Checkpoint"))
         valid = true;
     return valid;
 }
 
-
-int GetStartCheckpoint() {
-    CSmArenaClient@ playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
-    if(playground is null || playground.Arena is null){
+int GetSpawnCheckpoint() {
+    CSmPlayer@ smPlayer = GetPlayer();
+    if (smPlayer is null) {
         return -1;
     }
-    MwFastBuffer < CGameScriptMapLandmark @ > landmarks = playground.Arena.MapLandmarks;
-
-    for (uint i = 0; i < landmarks.Length; i++) {
-        if (IsWaypointStart(i)) {
-            return i;
-        }
-    }
-    return -1;
+    return smPlayer.SpawnIndex;
 }
 
 void UpdateWaypoints() {
-    numCps = 1;//one for finish
+    numCps = 1; //one for finish
     isMultiLap = false;
 
     array < int > links = {};
     bool strictMode = true;
 
     auto playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
-    if(playground is null || playground.Arena is null){
+    if (playground is null || playground.Arena is null) {
         return;
     }
-    MwFastBuffer < CGameScriptMapLandmark @ > landmarks = playground.Arena.MapLandmarks;
+    MwFastBuffer < CGameScriptMapLandmark@ > landmarks = playground.Arena.MapLandmarks;
     for (uint i = 0; i < landmarks.Length; i++) {
         if (landmarks[i].Waypoint is null) {
             continue;
         }
         if (landmarks[i].Waypoint.IsMultiLap) {
-            isMultiLap = true;
+            //isMultiLap = true;
             continue;
         }
         if (landmarks[i].Waypoint.IsFinish) {
@@ -401,10 +408,10 @@ void UpdateWaypoints() {
 
 //file io
 void LoadFile() {
-    if(currentMap == ""){
-        bestTimes = {};
+    if (currentMap == "") {
         return;
     }
+
     string baseFolder = IO::FromDataFolder('');
     string folder = baseFolder + 'BestCP';
     if (!IO::FolderExists(folder)) {
@@ -414,19 +421,24 @@ void LoadFile() {
 
     jsonFile = folder + '/' + currentMap + ".json";
 
-        firstLoad = !IO::FileExists(jsonFile);
-    if (firstLoad == false) {
-        // check validity of existing file
-        IO::File f(jsonFile);
-        f.Open(IO::FileMode::Read);
-        auto content = f.ReadToEnd();
-        f.Close();
-        if (content == "" || content == "null") {
-            DebugText("Invalid bestCPs file detected");
-            jsonData = Json::Object();
-        } else {
-            jsonData = Json::FromFile(jsonFile);
-        }
+    firstLoad = !IO::FileExists(jsonFile);
+
+    DebugText("Loading - " + jsonFile + " newFile?" + firstLoad);
+
+    if (firstLoad) {
+        //file doesnt exist, dont load
+        return;
+    }
+
+    IO::File f(jsonFile);
+    f.Open(IO::FileMode::Read);
+    auto content = f.ReadToEnd();
+    f.Close();
+    if (content == "" || content == "null") {
+        DebugText("Invalid bestCPs file detected");
+        jsonData = Json::Object();
+    } else {
+        jsonData = Json::FromFile(jsonFile);
     }
 
     if (jsonData.HasKey("version") && jsonData.HasKey("size")) {
@@ -445,7 +457,7 @@ void LoadFile() {
                     DebugText("json missing key " + i);
                 }
             }
-        }else{
+        } else {
             DebugText("invalid json version");
             bestTimes = {};
         }
@@ -457,6 +469,10 @@ void LoadFile() {
 
 void SaveFile() {
     firstLoad = false;
+
+    if(jsonFile == "") {
+        return;
+    }
 
     if (saveData == false) {
         return;
@@ -478,11 +494,11 @@ void SaveFile() {
 void Render() {
     auto app = cast < CTrackMania > (GetApp());
 
-//#if TMNEXT || MP4
+    //#if TMNEXT || MP4
     auto map = app.RootMap;
-//#elif TURBO
-//    auto map = app.Challenge;
-//#endif
+    //#elif TURBO
+    //    auto map = app.Challenge;
+    //#endif
 
 
     int timeWidth = 53;
@@ -495,7 +511,7 @@ void Render() {
         }
     }
 
-    if (windowVisible && map !is null && map.MapInfo.MapUid != "" && app.Editor is null) {
+    if (windowVisible && map!is null && map.MapInfo.MapUid != "" && app.Editor is null) {
         if (lockPosition) {
             UI::SetNextWindowPos(int(anchor.x), int(anchor.y), UI::Cond::Always);
         } else {
@@ -549,7 +565,7 @@ void Render() {
             UI::EndTable();
         }
 
-        int numCols = 4; 
+        int numCols = 4;
 
         if (UI::BeginTable("table", numCols, UI::TableFlags::SizingFixedFit)) {
             //if (showHeader) {
@@ -596,10 +612,10 @@ void Render() {
                     UI::TableNextColumn();
                     int delta = currTimes[i] - bestTimes[i];
                     if (delta > 0) {
-                        UI::PushStyleColor(UI::Col::Text, vec4(255,0,0,255));
+                        UI::PushStyleColor(UI::Col::Text, vec4(255, 0, 0, 255));
                         UI::Text("+" + Time::Format(delta));
                     } else {
-                        UI::PushStyleColor(UI::Col::Text, vec4(0,255,0,255));
+                        UI::PushStyleColor(UI::Col::Text, vec4(0, 255, 0, 255));
                         UI::Text("-" + Time::Format(-delta));
                     }
                     UI::PopStyleColor();
@@ -624,12 +640,12 @@ void SetMinWidth(int width) {
 }
 
 void LoadFont() {
-	string fontFaceToLoad = fontFace.Length == 0 ? "DroidSans.ttf" : fontFace;
-	if(fontFaceToLoad != loadedFontFace || fontSize != loadedFontSize) {
-		@font = Resources::GetFont(fontFaceToLoad, fontSize);
-		if(font !is null) {
-			loadedFontFace = fontFaceToLoad;
-			loadedFontSize = fontSize;
-		}
-	}
+    string fontFaceToLoad = fontFace.Length == 0 ? "DroidSans.ttf" : fontFace;
+    if (fontFaceToLoad != loadedFontFace || fontSize != loadedFontSize) {
+       @font = Resources::GetFont(fontFaceToLoad, fontSize);
+        if (font!is null) {
+            loadedFontFace = fontFaceToLoad;
+            loadedFontSize = fontSize;
+        }
+    }
 }
