@@ -17,17 +17,38 @@ string fontFace = "";
 [Setting category="Display Settings" name="Font size" min=8 max=48 description="To avoid a memory issue with loading a large number of fonts, you must reload the plugin for font changes to be applied."]
 int fontSize = 16;
 
+[Setting category="Options" name="Enable Logging" description="will start logging text to get an idea about what the programs doing"]
+bool enableLogging = false;
+
 [Setting category="Options" name="Save on run complete" description="Only stores/updates best times when a run is finished."]
 bool saveWhenCompleted = true;
 
-[Setting category="Options" name="Show window title" description="Adds a title to the top of the window"]
-bool showTitle = true;
+[Setting category="Options" name="Multi lap data override" description="should we let multi laps override our fastest time's (false will only use the first lap's time)"]
+bool multiLapOverride = true;
 
-[Setting category="Options" name="Show theoretical best" description="Adds theoretical best time to the end of the window headder"]
+[Setting category="Window Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
 bool showTheoreticalBest = true;
 
-[Setting category="Options" name="Multi lap data override" description="should we let multi laps override our fasest time's (false will only use the first lap's time)"]
-bool multiLapOverride = true;
+[Setting category="Window Options" name="Show checkpoints" description="Adds a number to the left for each checkpoint in the map"]
+bool showCheckpoints = true;
+
+[Setting category="Window Options" name="Show current times" description="Adds current times to the window"]
+bool showCurrent = false;
+
+[Setting category="Window Options" name="Show last lap Delta" description="Adds delta to the last lap to the window (only for multi lap)"]
+bool showLastLapDelta = false;
+
+[Setting category="Window Options" name="Show best/Theoretical Times" description="Adds best times to the window"]
+bool showBest = true;
+
+[Setting category="Window Options" name="Show best/Theoretical Delta" description="Adds best delta to the window"]
+bool showBestDelta = true;
+
+[Setting category="Window Options" name="Show personal best Times" description="Adds personal best times to the window"]
+bool showPB = true;
+
+[Setting category="Window Options" name="Show personal best Delta" description="Adds personal best delta to the window"]
+bool showPBDelta = true;
 
 [Setting category="Data" name="Save on disk" description="Stops saving data to disk - When this is disabled you will be able to load old data"]
 bool saveData = true;
@@ -67,6 +88,10 @@ Record@[] bestTimesRec;
 Record@[] pbTimesRec;
 int pbTime;
 
+//storage of which checkpoint we have been through
+Record@[] currLapTimesRec;
+Record@[] lastLapTimesRec;
+
 //extra
 bool waitForCarReset = true;
 bool resetData = true;
@@ -87,11 +112,8 @@ string jsonVersion = "1.2";
 
 
 void DebugText(string text) {
-    //print(text);
-}
-void DebugTextChecked(string text) {
-    if (GetCurrentCheckpoint() != -1) {
-        DebugText(text);
+    if(enableLogging){
+        print(text);
     }
 }
 
@@ -100,6 +122,10 @@ void Main() {
     //waitForCarReset = GetCurrentCheckpoint()!= 0;
     playerStartTime = GetPlayerStartTime();
     //currentMap = GetMapId();
+}
+
+void OnDestroyed(){
+    UpdateSaveBestData();
 }
 
 //clears data, waits till a reset to start happens
@@ -114,6 +140,8 @@ void ResetCommon() {
 
 void ResetRace() {
     currTimesRec = {};
+    currLapTimesRec = {};
+    lastLapTimesRec = {};
     isFinished = false;
     lastCP = GetSpawnCheckpoint();
     lastCpTime = 0;
@@ -210,15 +238,21 @@ void Update(float dt) {
         DebugText("Checkpoint change " + lastCP + "/" + cp);
 
         lastCP = cp;
-        currCP = currCP+1 % numCps;
+        currCP++;
 
         int raceTime = GetPlayerRaceTime();
 
         int deltaTime = raceTime - lastCpTime;
         lastCpTime = raceTime;
 
+        //if (isMultiLap && currentLap != 0) {
+        //    int before = currTimesRec[currCP - 1].time;
+        //    DebugText("Multi lap Comp: quicker? " + (before>deltaTime) + " " + Time::Format(before) + "/" + Time::Format(deltaTime));
+        //}
+        
         //add our time
         CreateOrUpdateCurrentTime(cp, deltaTime);
+        CreateOrUpdateCurrentLapTime(cp, deltaTime);
 
         //make sure bestTimes keeps up with the currTimes array
         if (bestTimesRec.Length < currTimesRec.Length) {
@@ -233,9 +267,12 @@ void Update(float dt) {
         //check for finish
         if (IsWaypointFinish(cp)) {
             currentLap++;
-            DebugText("Lap finish: " + currentLap +"/"+numLaps);
+            currCP = 0;
+            if (isMultiLap) {
+                DebugText("Lap finish: " + currentLap + "/" + numLaps);
+            }
             if (!isMultiLap || currentLap == numLaps || !multiLapOverride) {
-                DebugTextChecked("Race Finished");
+                DebugText("Race Finished");
                 waitForCarReset = true;
                 resetData = true;
                 isFinished = true;
@@ -316,6 +353,25 @@ void CreateOrUpdatePBTime(int checkpoint, int time) {
     }
 }
 
+void CreateOrUpdateCurrentLapTime(int checkpoint, int time) {
+    int recIndex = -1;
+    for (uint i = 0; i < currLapTimesRec.Length; i++) {
+        if (currLapTimesRec[i].checkpointId == checkpoint) {
+            recIndex = int(i);
+            break;
+        }
+    }
+
+    if (recIndex == -1) {
+        Record rec(checkpoint, time);
+        currLapTimesRec.InsertLast(rec);
+        lastLapTimesRec.InsertLast(Record(checkpoint, -1));
+    } else {
+        lastLapTimesRec[recIndex].time = currLapTimesRec[recIndex].time;
+        currLapTimesRec[recIndex].time = time;
+    }
+}
+
 void UpdatePersonalBestTimes() {
     if (isFinished && finishRaceTime != 0 && (finishRaceTime < pbTime || pbTime == 0)) {
         pbTime = finishRaceTime;
@@ -328,10 +384,19 @@ void UpdatePersonalBestTimes() {
 void UpdateSaveBestData() {
     bool save = true;
 
-    if (saveWhenCompleted) {
-        save = int(currTimesRec.Length) == numCps;
+    //if (saveWhenCompleted) {
+    //    save = int(currTimesRec.Length) == numCps;
+    //    if(save && isMultiLap){
+    //        save = currentLap == numLaps;
+    //    }
+    //    if(save && isMultiLap){
+    //        save = currentLap == numLaps;
+    //    }
+    //}
+    if (saveWhenCompleted && !isFinished) {
+        save = false;
     }
-    DebugText("saving times " + save + " - " + int(currTimesRec.Length) + "/" + numCps);
+    DebugText("saving times? " + save);
 
     if (save) {
         //update our best times
@@ -646,7 +711,7 @@ void SaveFile() {
 
     //quick validation
     if(currTimesRec.Length == bestTimesRec.Length && bestTimesRec.Length == pbTimesRec.Length){
-        print("Validation before save");
+        DebugText("Validation before save");
         for (uint i = 0; i < currTimesRec.Length; i++) {
             bestTimesRec[i].checkpointId = currTimesRec[i].checkpointId;
             pbTimesRec[i].checkpointId = currTimesRec[i].checkpointId;
@@ -686,6 +751,35 @@ void Render() {
     int timeWidth = 53;
     int deltaWidth = 60;
 
+    //show theoretical after finishing all checkpoints
+    bool shouldShowTheoretical = showTheoreticalBest && int(bestTimesRec.Length) == numCps;
+    bool shouldShowLastLapDelta = showLastLapDelta && isMultiLap && numLaps != 1;
+    //number of cols we show checkpoint data for
+    int dataCols = 0;
+    if (showCheckpoints) {
+        dataCols++;
+    }
+    if (showCurrent) {
+        dataCols++;
+    }  
+    if (shouldShowLastLapDelta) {
+        dataCols++;
+    }
+    if (showBest) {
+        dataCols++;
+    }
+    if (showBestDelta) {
+        dataCols++;
+    }
+    if (showPB) {
+        dataCols++;
+    }
+    if (showPBDelta) {
+        dataCols++;
+    }
+
+    bool isDisplayingSomething = shouldShowTheoretical || dataCols != 0;
+
     if (hideWithIFace) {
         auto playground = app.CurrentPlayground;
         if (playground is null || playground.Interface is null || UI::IsGameUIVisible()) {
@@ -693,7 +787,7 @@ void Render() {
         }
     }
 
-    if (windowVisible && map!is null && map.MapInfo.MapUid != "" && app.Editor is null) {
+    if (isDisplayingSomething && windowVisible && map!is null && map.MapInfo.MapUid != "" && app.Editor is null) {
         if (lockPosition) {
             UI::SetNextWindowPos(int(anchor.x), int(anchor.y), UI::Cond::Always);
         } else {
@@ -715,34 +809,23 @@ void Render() {
 
         UI::BeginGroup();
 
-        //show theoretical after finishing all checkpoints
-        bool shouldShowTheoretical = showTheoreticalBest && int(bestTimesRec.Length) == numCps;
-        //show lowest if we have finished or on a seperate lap
-        bool shouldShowLowest = isFinished || (currentLap != 0);
-
         //if (UI::BeginTable("Header", 2, UI::TableFlags::SizingFixedFit)) {
         //        UI::TableNextColumn();
         //    UI::Text("Sector Times");
         //    UI::EndTable();
         //}
 
-        if (shouldShowTheoretical && UI::BeginTable("info", 4, UI::TableFlags::SizingFixedFit)) {
+        if (UI::BeginTable("info", 4, UI::TableFlags::SizingFixedFit)) {
 
-            {
+            if (shouldShowTheoretical) {
                 UI::TableNextColumn();
                 SetMinWidth(timeWidth);
-                UI::Text("Combined");
+                UI::Text("Theoretical");
 
-                //UI::TableNextColumn();
-                //SetMinWidth(timeWidth);
-                //UI::Text("Estimated");
-            }
+                UI::TableNextColumn(); {
+                    //show lowest if we have finished or on a seperate lap
+                    bool shouldShowLowest = isFinished || (currentLap != 0);
 
-            //UI::TableNextRow();
-            
-            {
-                UI::TableNextColumn(); 
-                {
                     int theoreticalBest = 0;
                     for (uint i = 0; i < bestTimesRec.Length; i++) {
                         //if we have finished then grab the best of both times
@@ -753,91 +836,127 @@ void Render() {
                             theoreticalBest += bestTimesRec[i].time;
                         }
                     }
-                    UI::Text(Time::Format(theoreticalBest));
+                    UI::Text("~" + Time::Format(theoreticalBest));
                 }
-                //UI::TableNextColumn(); 
-                //{
-                //    UI::Text(Time::Format(CalulateEstimatedTime()));
-                //}
-            }
 
-            //{
-            //    UI::TableNextColumn();
-            //    UI::Text("pb"); 
-            //    UI::TableNextColumn();
-            //    UI::Text(Time::Format(pbTime));
-            //}
+            }
 
             UI::EndTable();
 
         }
 
-        if (UI::BeginTable("table", 5, UI::TableFlags::SizingFixedFit)) {
+
+        if (dataCols != 0 && UI::BeginTable("table", dataCols, UI::TableFlags::SizingFixedFit)) {
             //if (showHeader) {
             {
-                UI::TableNextColumn();
-                SetMinWidth(0);
-                UI::Text("Cp");
+                if (showCheckpoints) {
+                    UI::TableNextColumn();
+                    SetMinWidth(0);
+                    UI::Text("Cp");
+                }
 
-                UI::TableNextColumn();
-                SetMinWidth(timeWidth);
-                UI::Text("Best");
+                if (showCurrent) {
+                    UI::TableNextColumn();
+                    SetMinWidth(timeWidth);
+                    UI::Text("Current");
+                }
+                
+                if (shouldShowLastLapDelta) {
+                    UI::TableNextColumn();
+                    SetMinWidth(timeWidth);
+                    UI::Text("Lap Delta");
+                }
 
-                UI::TableNextColumn();
-                SetMinWidth(deltaWidth);
-                UI::Text("Delta");
-
-                UI::TableNextColumn();
-                SetMinWidth(timeWidth);
-                UI::Text("PB");
-
-                UI::TableNextColumn();
-                SetMinWidth(deltaWidth);
-                UI::Text("Delta");
+                if (showBest) {
+                    UI::TableNextColumn();
+                    SetMinWidth(timeWidth);
+                    UI::Text("Best");
+                }
+                if (showBestDelta) {
+                    UI::TableNextColumn();
+                    SetMinWidth(deltaWidth);
+                    UI::Text("B. Delta");
+                }
+                if (showPB) {
+                    UI::TableNextColumn();
+                    SetMinWidth(timeWidth);
+                    UI::Text("PB");
+                }
+                if (showPBDelta) {
+                    UI::TableNextColumn();
+                    SetMinWidth(deltaWidth);
+                    UI::Text("PB. Delta");
+                }
             }
 
-            bool isPBFaster = pbTime > finishRaceTime;
+            bool isPBFaster = pbTime >= finishRaceTime;
 
             for (uint i = 0; i < bestTimesRec.Length; i++) {
 
                 UI::TableNextRow();
 
                 //CP
-                UI::TableNextColumn();
-                UI::Text("" + (i + 1));
+                if (showCheckpoints) {
+                    UI::TableNextColumn();
+                    UI::Text("" + (i + 1));
+                }
+
+                if (showCurrent) {
+                    UI::TableNextColumn();
+                    if (currTimesRec.Length > i) {
+                        UI::Text(Time::Format(currTimesRec[i].time));
+                    }
+                }
+
+                if(shouldShowLastLapDelta){
+                    UI::TableNextColumn();
+                    if (currentLap != 0 && currLapTimesRec.Length > i && lastLapTimesRec[i].time != -1) {
+                        int delta = currLapTimesRec[i].time - lastLapTimesRec[i].time;
+                        DrawDeltaText(delta);
+                    }
+                }
 
                 //Best
-                UI::TableNextColumn();
-                UI::Text(Time::Format(bestTimesRec[i].time));
-
-                UI::TableNextColumn();
-                if (currTimesRec.Length > i) {
-                    int delta = currTimesRec[i].time - bestTimesRec[i].time;
-                    DrawDeltaText(delta);
+                if (showBest) {
+                    UI::TableNextColumn();
+                    UI::Text(Time::Format(bestTimesRec[i].time));
+                }
+                if (showBestDelta) {
+                    UI::TableNextColumn();
+                    if (currTimesRec.Length > i) {
+                        int delta = currTimesRec[i].time - bestTimesRec[i].time;
+                        DrawDeltaText(delta);
+                    }
                 }
 
                 if (pbTimesRec.Length > i) {
 
                     //Personal Best
-                    UI::TableNextColumn();
-                    //colors here are useless?
-                    //if (isFinished) {
-                    //    if (isPBFaster) {
-                    //        UI::PushStyleColor(UI::Col::Text, vec4(0, 255, 0, 255));
-                    //    } else {
-                    //        UI::PushStyleColor(UI::Col::Text, vec4(255, 0, 0, 255));
-                    //    }
-                    //}
-                    UI::Text(Time::Format(pbTimesRec[i].time));
-                    //if (isFinished) {
-                    //    UI::PopStyleColor();
-                    //}
-
-                    UI::TableNextColumn();
-                    if (currTimesRec.Length > i) {
-                        int delta = currTimesRec[i].time - pbTimesRec[i].time;
-                        DrawDeltaText(delta);
+                    if (showPB) {
+                        UI::TableNextColumn();
+                        //colors here are useless?
+                        if (isFinished) {
+                            if (isPBFaster) {
+                                UI::PushStyleColor(UI::Col::Text, vec4(255, 255, 255, 255));
+                            } else {
+                                UI::PushStyleColor(UI::Col::Text, vec4(255, 0, 0, 255));
+                            }
+                        }
+                        UI::Text(Time::Format(pbTimesRec[i].time));
+                        if (isFinished) {
+                            UI::PopStyleColor();
+                        }
                     }
+                    if (showPBDelta) {
+                        UI::TableNextColumn();
+                        if (currTimesRec.Length > i) {
+                            int delta = currTimesRec[i].time - pbTimesRec[i].time;
+                            DrawDeltaText(delta);
+                        }
+                    }
+                } else {
+                    UI::TableNextColumn();
+                    UI::TableNextColumn();
                 }
 
             }
