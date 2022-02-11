@@ -86,9 +86,9 @@ class Record {
     int time;
 
     Record(int checkpointId, int time) {
-		this.checkpointId = checkpointId;
-		this.time = time;
-	}
+        this.checkpointId = checkpointId;
+        this.time = time;
+    }
 }
 
 //storage
@@ -127,7 +127,7 @@ int lastLapTime = 0;
 int lastEstimatedTime = 0;
 
 void DebugText(string text) {
-    if(enableLogging){
+    if (enableLogging) {
         print(text);
     }
 }
@@ -139,7 +139,7 @@ void Main() {
     //currentMap = GetMapId();
 }
 
-void OnDestroyed(){
+void OnDestroyed() {
     UpdateSaveBestData();
 }
 
@@ -269,11 +269,11 @@ void Update(float dt) {
         CreateOrUpdateCurrentTime(cp, deltaTime);
 
         //update one frame behind
-        if(int(currLapTimesRec.Length) == numCps){
+        if (int(currLapTimesRec.Length) == numCps) {
             CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time);
-        }else{
-            if(int(bestTimesRec.Length) != numCps){
-            CreateOrUpdateBestTime(cp, deltaTime);
+        } else {
+            if (int(bestTimesRec.Length) != numCps) {
+                CreateOrUpdateBestTime(cp, deltaTime);
             }
         }
 
@@ -311,7 +311,7 @@ void Update(float dt) {
 void CreateOrUpdateCurrentTime(int checkpoint, int time) {
     int recIndex = -1;
     for (uint i = 0; i < currTimesRec.Length; i++) {
-        if(currTimesRec[i].checkpointId == checkpoint){
+        if (currTimesRec[i].checkpointId == checkpoint) {
             recIndex = int(i);
             break;
         }
@@ -321,7 +321,7 @@ void CreateOrUpdateCurrentTime(int checkpoint, int time) {
         Record rec(checkpoint, time);
         currTimesRec.InsertLast(rec);
     } else {
-        if(currTimesRec[recIndex].time > time){
+        if (currTimesRec[recIndex].time > time) {
             currTimesRec[recIndex].time = time;
         }
     }
@@ -360,7 +360,7 @@ void CreateOrUpdatePBTime(int checkpoint, int time) {
         pbTimesRec.InsertLast(rec);
     } else {
         //if (pbTimesRec[recIndex].time > time) {
-            pbTimesRec[recIndex].time = time;
+        pbTimesRec[recIndex].time = time;
         //}
     }
 }
@@ -584,7 +584,7 @@ void UpdateWaypoints() {
     CGameCtnChallenge@ map = playground.Map;
     numLaps = map.TMObjective_NbLaps;
     isMultiLap = map.TMObjective_IsLapRace;
-    DebugText("Map Laps: " +numLaps + " Is MultiLap: " + isMultiLap);
+    DebugText("Map Laps: " + numLaps + " Is MultiLap: " + isMultiLap);
 
     MwFastBuffer < CGameScriptMapLandmark@ > landmarks = playground.Arena.MapLandmarks;
     for (uint i = 0; i < landmarks.Length; i++) {
@@ -629,8 +629,8 @@ int CalulateEstimatedTime() {
     for (int i = 0; i < int(bestTimesRec.Length); i++) {
         if (currCP > i) {
             theoreticalBest += currLapTimesRec[i].time;
-        }else{
-        theoreticalBest += bestTimesRec[i].time;
+        } else {
+            theoreticalBest += bestTimesRec[i].time;
 
         }
     }
@@ -675,8 +675,7 @@ void LoadFile() {
 
     if (jsonData.HasKey("version") && jsonData.HasKey("size")) {
         string version = jsonData["version"];
-        if (version == jsonVersion || version == "1.1" ) 
-        {
+        if (version == jsonVersion || version == "1.1") {
 
             numCps = jsonData["size"];
             if (version == "1.2") {
@@ -685,10 +684,10 @@ void LoadFile() {
             for (int i = 0; i < numCps; i++) {
                 string key = "" + i;
                 if (jsonData.HasKey(key)) {
-                    if(version == "1.0") {
+                    if (version == "1.0") {
                         //1.0 stored in seperate data, with no checkpoint index
                         CreateOrUpdateBestTime(-1, jsonData[key]);
-                    }else{//current
+                    } else { //current
                         CreateOrUpdateBestTime(jsonData[key]["cp"], jsonData[key]["time"]);
                         if (version == "1.2") {
                             CreateOrUpdatePBTime(jsonData[key]["cp"], jsonData[key]["pbTime"]);
@@ -697,7 +696,7 @@ void LoadFile() {
                 } else {
                     DebugText("json missing key " + i);
                 }
-                if(bestTimesRec[i].checkpointId == -1){
+                if (bestTimesRec[i].checkpointId == -1) {
                     DebugText("-1 checkpoint id, invalid file");
                     ResetCommon();
                     return;
@@ -715,7 +714,7 @@ void LoadFile() {
 void SaveFile() {
     firstLoad = false;
 
-    if(jsonFile == "") {
+    if (jsonFile == "") {
         return;
     }
 
@@ -724,7 +723,7 @@ void SaveFile() {
     }
 
     //quick validation
-    if(currTimesRec.Length == bestTimesRec.Length && bestTimesRec.Length == pbTimesRec.Length){
+    if (currTimesRec.Length == bestTimesRec.Length && bestTimesRec.Length == pbTimesRec.Length) {
         DebugText("Validation before save");
         for (uint i = 0; i < currTimesRec.Length; i++) {
             bestTimesRec[i].checkpointId = currTimesRec[i].checkpointId;
@@ -745,7 +744,7 @@ void SaveFile() {
         arrayData["time"] = bestTimesRec[i].time;
         arrayData["pbTime"] = pbTimesRec[i].time;
         arrayData["cp"] = bestTimesRec[i].checkpointId;
-        jsonData[""+i] = arrayData;
+        jsonData["" + i] = arrayData;
     }
 
     Json::ToFile(jsonFile, jsonData);
@@ -776,7 +775,7 @@ void Render() {
     }
     if (showCurrent) {
         dataCols++;
-    }  
+    }
     if (shouldShowLastLapDelta && showLastLap) {
         dataCols++;
     }
@@ -879,7 +878,7 @@ void Render() {
                     UI::Text("~" + Time::Format(time));
 
                 }
-                    //UI::PopStyleColor();
+                //UI::PopStyleColor();
             }
 
             UI::EndTable();
@@ -901,12 +900,12 @@ void Render() {
                     SetMinWidth(timeWidth);
                     UI::Text("Current");
                 }
-                
+
                 if (shouldShowLastLapDelta && showLastLap) {
                     UI::TableNextColumn();
                     SetMinWidth(timeWidth);
                     UI::Text("Last Lap");
-                }   
+                }
 
                 if (shouldShowLastLapDelta && showLastLapDelta) {
                     UI::TableNextColumn();
@@ -950,8 +949,8 @@ void Render() {
 
                 if (showCurrent) {
                     UI::TableNextColumn();
-                    if(currLapTimesRec.Length > i){
-                    UI::Text(Time::Format(currLapTimesRec[i].time));
+                    if (currLapTimesRec.Length > i) {
+                        UI::Text(Time::Format(currLapTimesRec[i].time));
                     }
                 }
 
@@ -964,7 +963,7 @@ void Render() {
                     }
                     if (showLastLapDelta) {
                         UI::TableNextColumn();
-                        if (currentLap != 0 && currLapTimesRec.Length > i && lastLapTimesRec.Length > i  && lastLapTimesRec[i].time != -1) {
+                        if (currentLap != 0 && currLapTimesRec.Length > i && lastLapTimesRec.Length > i && lastLapTimesRec[i].time != -1) {
                             int delta = currLapTimesRec[i].time - lastLapTimesRec[i].time;
                             DrawDeltaText(delta);
                         }
@@ -975,7 +974,7 @@ void Render() {
                 if (showBest) {
                     UI::TableNextColumn();
                     if (bestTimesRec.Length > i) {
-                    UI::Text(Time::Format(bestTimesRec[i].time));
+                        UI::Text(Time::Format(bestTimesRec[i].time));
                     }
                 }
                 if (showBestDelta) {
