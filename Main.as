@@ -29,13 +29,19 @@ bool multiLapOverride = true;
 [Setting category="Window Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
 bool showTheoreticalBest = true;
 
+[Setting category="Window Options" name="Show estimated time (experimental)" description="Adds estimated finish time to the window header"]
+bool showEstimated = false;
+
 [Setting category="Window Options" name="Show checkpoints" description="Adds a number to the left for each checkpoint in the map"]
 bool showCheckpoints = true;
 
 [Setting category="Window Options" name="Show current times" description="Adds current times to the window"]
 bool showCurrent = false;
 
-[Setting category="Window Options" name="Show last lap Delta" description="Adds delta to the last lap to the window (only for multi lap)"]
+[Setting category="Window Options" name="Show last lap Times (multi lap)" description="Adds last lap time to the window (only for multi lap)"]
+bool showLastLap = false;
+
+[Setting category="Window Options" name="Show last lap Delta (multi lap)" description="Adds delta to the last lap to the window (only for multi lap)"]
 bool showLastLapDelta = false;
 
 [Setting category="Window Options" name="Show best/Theoretical Times" description="Adds best times to the window"]
@@ -49,6 +55,9 @@ bool showPB = true;
 
 [Setting category="Window Options" name="Show personal best Delta" description="Adds personal best delta to the window"]
 bool showPBDelta = true;
+
+[Setting category="Window Options" name="Show personal best Color" description="Shows red on the PB times when it's below your pb"]
+bool showPBColor = true;
 
 [Setting category="Data" name="Save on disk" description="Stops saving data to disk - When this is disabled you will be able to load old data"]
 bool saveData = true;
@@ -83,8 +92,11 @@ class Record {
 }
 
 //storage
+//this Race Best times
 Record@[] currTimesRec;
+//overall best times
 Record@[] bestTimesRec;
+//personal best times (times for the personal best score)
 Record@[] pbTimesRec;
 int pbTime;
 
@@ -110,6 +122,9 @@ string jsonFile = '';
 Json::Value jsonData = Json::Object();
 string jsonVersion = "1.2";
 
+//ui timing
+int lastLapTime = 0;
+int lastEstimatedTime = 0;
 
 void DebugText(string text) {
     if(enableLogging){
@@ -148,6 +163,7 @@ void ResetRace() {
     currentLap = 0;
     currCP = 0;
     finishRaceTime = 0;
+    lastLapTime = 0;
 }
 
 void Update(float dt) {
@@ -238,7 +254,6 @@ void Update(float dt) {
         DebugText("Checkpoint change " + lastCP + "/" + cp);
 
         lastCP = cp;
-        currCP++;
 
         int raceTime = GetPlayerRaceTime();
 
@@ -249,37 +264,44 @@ void Update(float dt) {
         //    int before = currTimesRec[currCP - 1].time;
         //    DebugText("Multi lap Comp: quicker? " + (before>deltaTime) + " " + Time::Format(before) + "/" + Time::Format(deltaTime));
         //}
-        
+
         //add our time
         CreateOrUpdateCurrentTime(cp, deltaTime);
+
+        //update one frame behind
+        if(int(currLapTimesRec.Length) == numCps){
+            CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time);
+        }else{
+            if(int(bestTimesRec.Length) != numCps){
+            CreateOrUpdateBestTime(cp, deltaTime);
+            }
+        }
+
         CreateOrUpdateCurrentLapTime(cp, deltaTime);
 
-        //make sure bestTimes keeps up with the currTimes array
-        if (bestTimesRec.Length < currTimesRec.Length) {
-            //bestTimesRec.InsertLast(deltaTime);
-            //bestTimesRec.InsertLast(deltaTime);
-            CreateOrUpdateBestTime(cp, deltaTime);
-        }
-        if (pbTimesRec.Length < currTimesRec.Length) {
-            CreateOrUpdatePBTime(cp, deltaTime);
-        }
+        currCP++;
 
         //check for finish
         if (IsWaypointFinish(cp)) {
+            lastLapTime = Time::get_Now();
             currentLap++;
-            currCP = 0;
             if (isMultiLap) {
                 DebugText("Lap finish: " + currentLap + "/" + numLaps);
             }
+
             if (!isMultiLap || currentLap == numLaps || !multiLapOverride) {
                 DebugText("Race Finished");
+
                 waitForCarReset = true;
                 resetData = true;
                 isFinished = true;
                 finishRaceTime = GetPlayerRaceTime();
-                if(pbTime == 0){
+                if (pbTime == 0) {
                     UpdatePersonalBestTimes();
                 }
+            } else {
+                //not finished, reset currCP
+                currCP = 0;
             }
         }
 
@@ -308,26 +330,16 @@ void CreateOrUpdateCurrentTime(int checkpoint, int time) {
 void CreateOrUpdateBestTime(int checkpoint, int time) {
     int recIndex = -1;
     for (uint i = 0; i < bestTimesRec.Length; i++) {
-        if (bestTimesRec[i].checkpointId == -1) { //temp jsonVersion 1.0
-            recIndex == int(i);
-            break;
-        }
         if (bestTimesRec[i].checkpointId == checkpoint) {
             recIndex = int(i);
             break;
         }
     }
 
-    //temp jsonVersion 1.0
-    if (checkpoint == -1) {
-        recIndex = -1;
-    }
-
     if (recIndex == -1) {
         Record rec(checkpoint, time);
         bestTimesRec.InsertLast(rec);
     } else {
-        bestTimesRec[recIndex].checkpointId = checkpoint; //temp jsonVersion 1.0
         if (bestTimesRec[recIndex].time > time) {
             bestTimesRec[recIndex].time = time;
         }
@@ -347,9 +359,9 @@ void CreateOrUpdatePBTime(int checkpoint, int time) {
         Record rec(checkpoint, time);
         pbTimesRec.InsertLast(rec);
     } else {
-        if (pbTimesRec[recIndex].time > time) {
+        //if (pbTimesRec[recIndex].time > time) {
             pbTimesRec[recIndex].time = time;
-        }
+        //}
     }
 }
 
@@ -375,8 +387,9 @@ void CreateOrUpdateCurrentLapTime(int checkpoint, int time) {
 void UpdatePersonalBestTimes() {
     if (isFinished && finishRaceTime != 0 && (finishRaceTime < pbTime || pbTime == 0)) {
         pbTime = finishRaceTime;
-        for (uint i = 0; i < pbTimesRec.Length; i++) {
-            pbTimesRec[i].time = currTimesRec[i].time;
+        for (uint i = 0; i < currTimesRec.Length; i++) {
+            CreateOrUpdatePBTime(currTimesRec[i].checkpointId, currTimesRec[i].time);
+            //pbTimesRec[i].time = currTimesRec[i].time;
         }
     }
 }
@@ -613,23 +626,16 @@ int CalulateEstimatedTime() {
         return 0;
     }
     int theoreticalBest = 0;
-    int deltaDiff = 0;
-    for (uint i = 0; i < bestTimesRec.Length; i++) {
-        int time = bestTimesRec[i].time;
-        theoreticalBest += time;
-        if (currTimesRec.Length > i) {
-            deltaDiff += bestTimesRec[i].time;
-        }
-    }
-    if (currCP >= 0 && currCP < int(bestTimesRec.Length)) {
-        int raceTime = GetPlayerRaceTime();
-        int currentOffset = raceTime - deltaDiff - bestTimesRec[currCP].time;
-        if (currentOffset > 0) {
-            deltaDiff -= currentOffset;
+    for (int i = 0; i < int(bestTimesRec.Length); i++) {
+        if (currCP > i) {
+            theoreticalBest += currLapTimesRec[i].time;
+        }else{
+        theoreticalBest += bestTimesRec[i].time;
+
         }
     }
 
-    return theoreticalBest - deltaDiff;
+    return theoreticalBest;
 }
 
 //file io
@@ -669,7 +675,7 @@ void LoadFile() {
 
     if (jsonData.HasKey("version") && jsonData.HasKey("size")) {
         string version = jsonData["version"];
-        //if (version == jsonVersion) {
+        if (version == jsonVersion || version == "1.1" ) 
         {
 
             numCps = jsonData["size"];
@@ -691,11 +697,19 @@ void LoadFile() {
                 } else {
                     DebugText("json missing key " + i);
                 }
+                if(bestTimesRec[i].checkpointId == -1){
+                    DebugText("-1 checkpoint id, invalid file");
+                    ResetCommon();
+                    return;
+                }
             }
+
+
         }
     } else {
         DebugText("invalid json file");
     }
+
 }
 
 void SaveFile() {
@@ -753,7 +767,8 @@ void Render() {
 
     //show theoretical after finishing all checkpoints
     bool shouldShowTheoretical = showTheoreticalBest && int(bestTimesRec.Length) == numCps;
-    bool shouldShowLastLapDelta = showLastLapDelta && isMultiLap && numLaps != 1;
+    bool shouldShowEstimated = showEstimated && int(bestTimesRec.Length) == numCps;
+    bool shouldShowLastLapDelta = isMultiLap && numLaps != 1;
     //number of cols we show checkpoint data for
     int dataCols = 0;
     if (showCheckpoints) {
@@ -762,7 +777,10 @@ void Render() {
     if (showCurrent) {
         dataCols++;
     }  
-    if (shouldShowLastLapDelta) {
+    if (shouldShowLastLapDelta && showLastLap) {
+        dataCols++;
+    }
+    if (shouldShowLastLapDelta && showLastLapDelta) {
         dataCols++;
     }
     if (showBest) {
@@ -778,7 +796,7 @@ void Render() {
         dataCols++;
     }
 
-    bool isDisplayingSomething = shouldShowTheoretical || dataCols != 0;
+    bool isDisplayingSomething = shouldShowEstimated || shouldShowTheoretical || dataCols != 0;
 
     if (hideWithIFace) {
         auto playground = app.CurrentPlayground;
@@ -841,6 +859,29 @@ void Render() {
 
             }
 
+            if (shouldShowEstimated) {
+                int time = 0;
+                if (currCP != 0 || !isMultiLap) {
+                    //UI::PushStyleColor(UI::Col::Text, vec4(255, 255, 255, 255));
+                    lastEstimatedTime = CalulateEstimatedTime();
+                } else {
+                    //UI::PushStyleColor(UI::Col::Text, vec4(128, 128, 255, 255));
+                    //last checkpoint delta off
+                    time = currLapTimesRec[numCps - 1].time - bestTimesRec[numCps - 1].time;
+                }
+                time += lastEstimatedTime;
+
+                if (time != 0) {
+                    UI::TableNextColumn();
+                    UI::Text("Estimated");
+                    UI::TableNextColumn();
+
+                    UI::Text("~" + Time::Format(time));
+
+                }
+                    //UI::PopStyleColor();
+            }
+
             UI::EndTable();
 
         }
@@ -861,7 +902,13 @@ void Render() {
                     UI::Text("Current");
                 }
                 
-                if (shouldShowLastLapDelta) {
+                if (shouldShowLastLapDelta && showLastLap) {
+                    UI::TableNextColumn();
+                    SetMinWidth(timeWidth);
+                    UI::Text("Last Lap");
+                }   
+
+                if (shouldShowLastLapDelta && showLastLapDelta) {
                     UI::TableNextColumn();
                     SetMinWidth(timeWidth);
                     UI::Text("Lap Delta");
@@ -903,28 +950,38 @@ void Render() {
 
                 if (showCurrent) {
                     UI::TableNextColumn();
-                    if (currTimesRec.Length > i) {
-                        UI::Text(Time::Format(currTimesRec[i].time));
+                    if(currLapTimesRec.Length > i){
+                    UI::Text(Time::Format(currLapTimesRec[i].time));
                     }
                 }
 
-                if(shouldShowLastLapDelta){
-                    UI::TableNextColumn();
-                    if (currentLap != 0 && currLapTimesRec.Length > i && lastLapTimesRec[i].time != -1) {
-                        int delta = currLapTimesRec[i].time - lastLapTimesRec[i].time;
-                        DrawDeltaText(delta);
+                if (shouldShowLastLapDelta) {
+                    if (showLastLap) {
+                        UI::TableNextColumn();
+                        if (currentLap != 0 && lastLapTimesRec.Length > i && lastLapTimesRec[i].time != -1) {
+                            UI::Text(Time::Format(lastLapTimesRec[i].time));
+                        }
+                    }
+                    if (showLastLapDelta) {
+                        UI::TableNextColumn();
+                        if (currentLap != 0 && currLapTimesRec.Length > i && lastLapTimesRec.Length > i  && lastLapTimesRec[i].time != -1) {
+                            int delta = currLapTimesRec[i].time - lastLapTimesRec[i].time;
+                            DrawDeltaText(delta);
+                        }
                     }
                 }
 
                 //Best
                 if (showBest) {
                     UI::TableNextColumn();
+                    if (bestTimesRec.Length > i) {
                     UI::Text(Time::Format(bestTimesRec[i].time));
+                    }
                 }
                 if (showBestDelta) {
                     UI::TableNextColumn();
-                    if (currTimesRec.Length > i) {
-                        int delta = currTimesRec[i].time - bestTimesRec[i].time;
+                    if (bestTimesRec.Length > i && currLapTimesRec.Length > i) {
+                        int delta = currLapTimesRec[i].time - bestTimesRec[i].time;
                         DrawDeltaText(delta);
                     }
                 }
@@ -935,7 +992,7 @@ void Render() {
                     if (showPB) {
                         UI::TableNextColumn();
                         //colors here are useless?
-                        if (isFinished) {
+                        if (showPBColor && isFinished) {
                             if (isPBFaster) {
                                 UI::PushStyleColor(UI::Col::Text, vec4(255, 255, 255, 255));
                             } else {
@@ -943,14 +1000,14 @@ void Render() {
                             }
                         }
                         UI::Text(Time::Format(pbTimesRec[i].time));
-                        if (isFinished) {
+                        if (showPBColor && isFinished) {
                             UI::PopStyleColor();
                         }
                     }
                     if (showPBDelta) {
                         UI::TableNextColumn();
                         if (currTimesRec.Length > i) {
-                            int delta = currTimesRec[i].time - pbTimesRec[i].time;
+                            int delta = currLapTimesRec[i].time - pbTimesRec[i].time;
                             DrawDeltaText(delta);
                         }
                     }
