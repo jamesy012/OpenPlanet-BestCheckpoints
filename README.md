@@ -11,7 +11,7 @@ Looking to partly emulate the F1 sector times
 
 lots of options in the settings.
 
-Includes a theoretical best and estimaged time 
+Includes a theoretical best and estimated time 
 
 By default it only updates your best times when you finish a run With an option in the settings to save on half completed runs
 
