@@ -89,6 +89,13 @@ class Record {
         this.checkpointId = checkpointId;
         this.time = time;
     }
+
+    Record@ opAssign(const Record &in record)
+	{
+		checkpointId = record.checkpointId;
+		time = record.time;
+        return this;
+	}
 }
 
 //storage
@@ -389,8 +396,9 @@ void UpdatePersonalBestTimes() {
         pbTime = finishRaceTime;
         for (uint i = 0; i < currTimesRec.Length; i++) {
             CreateOrUpdatePBTime(currTimesRec[i].checkpointId, currTimesRec[i].time);
-            //pbTimesRec[i].time = currTimesRec[i].time;
         }
+        //Final checkpoint is finish, can have multiple finish checkpoints, so this overides that
+        pbTimesRec[currTimesRec.Length-1] = currTimesRec[currTimesRec.Length-1];
     }
 }
 
