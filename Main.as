@@ -200,6 +200,7 @@ void Update(float dt) {
 
             LoadFile();
 
+            //UpdateCheckpointData();
             UpdateWaypoints();
         }
     }
@@ -231,8 +232,6 @@ void Update(float dt) {
 
             ResetRace();
 
-
-            //playerStartTime = GetPlayerStartTime();
             playerStartTime = GetActualPlayerStartTime();
 
             if (numCps == 0) {
@@ -260,6 +259,8 @@ void Update(float dt) {
         lastCP = cp;
 
         int raceTime = GetPlayerRaceTime();
+
+        GetTimeBasedOnCar(cp);
 
         int deltaTime = raceTime - lastCpTime;
         lastCpTime = raceTime;
@@ -310,6 +311,161 @@ void Update(float dt) {
         }
 
     }
+}
+
+class CheckpointRecord {
+    //CGameScriptMapLandmark data
+    int checkpointId = -1;
+    vec3 pos;
+
+    //CGameCtnBlock data
+    CGameCtnBlock::ECardinalDirections dir;
+    vec3 coord;
+    CGameCtnBlockInfo::EWayPointType type;
+}
+
+CheckpointRecord@[] checkpointData;
+
+void UpdateCheckpointData() {
+    print("UpdateCheckpointData");
+    checkpointData = {};
+    CSmArenaClient@ playground = GetPlayground();
+    if (playground is null || playground.Map is null) {
+        return;
+    }
+    vec3 size = vec3(playground.Map.Size.x,playground.Map.Size.y,playground.Map.Size.z);
+    const int blockSize = 32;
+    print("Size: " + size.ToString());
+    for (int i = 0; i < playground.Map.Blocks.Length; i++) {
+        CGameCtnBlock @ block = playground.Map.Blocks[i];
+        if (block.WaypointSpecialProperty!is null || block.BlockInfo.WaypointType != CGameCtnBlockInfo::EWayPointType::None) {
+            CheckpointRecord rec;
+            rec.dir = block.Dir;
+            rec.coord = vec3(block.CoordX, block.CoordY, block.CoordZ);
+            rec.type = block.BlockInfo.WayPointType;
+            rec.pos = block.BlockModel.VariantBaseGround.SpawnTrans / 2;
+            checkpointData.InsertLast(rec);
+
+            //for (int q = 0; q < block.BlockUnits.Length; q++) {
+            //    CGameCtnBlockUnit @ blockUnit = block.BlockUnits[q];
+            //    for (int j = 0; j < blockUnit.BlockUnitModel.Clips_North.Length; j++) {
+            //        if(blockUnit.BlockUnitModel.Clips_North[j] is null){
+            //            print("Null clip");
+            //            continue;
+            //        }
+            //        CGameCtnBlockInfoClip@ clip = blockUnit.BlockUnitModel.Clips_North[j];
+            //        if (clip.HasPassingPoint) {
+            //            print("asdasdas");
+            //        }
+            //    }
+            //}
+        }
+    }
+    //if(playground.Arena.MapLandmarks.Length != checkpointData.Length){
+    //    print("Checkpoint lenths dont match");
+    //    return;
+    //}
+    //for (int i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
+    //    CGameScriptMapLandmark@ checkpoint = playground.Arena.MapLandmarks[i];
+    //    CheckpointRecord@ rec = checkpointData[i];
+    //    rec.checkpointId = i;
+    //    rec.pos = checkpoint.Position;
+    //}
+    for (int q = 0; q < checkpointData.Length; q++) {
+        print("checkpointData coord " + checkpointData[q].coord.ToString());
+    }
+    for (int i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
+        CGameScriptMapLandmark@ checkpoint = playground.Arena.MapLandmarks[i];
+        print("MapLandmarks pos " + checkpoint.Position.ToString());
+        print("\t"+(checkpoint.Position/blockSize).ToString());
+    }
+    for (int i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
+        print(i);
+        CGameScriptMapLandmark @ checkpoint = playground.Arena.MapLandmarks[i];
+        vec3 coordPos = checkpoint.Position / blockSize;
+        //coordPos.x -= 0.0;
+        //coordPos.z -= 0.5;
+        print("\t" + coordPos.ToString());
+        coordPos.y = 0;
+        int closest = -1;
+        float closestDistance = 9999;
+                if(checkpoint.PlayerSpawn !is null){
+            print("\tcp skipped");
+            continue;
+        }
+        for (int q = 0; q < checkpointData.Length; q++) {
+            print(q);
+            vec3 checkPos = checkpointData[q].coord;
+            print("\t" + checkPos.ToString());
+            checkPos.y = 0;
+            //print(coordPos - checkPos);
+            float distance = (coordPos - checkPos).Length();
+            print("\t" + distance);
+            if(closestDistance > distance ){
+                closestDistance = distance;
+                closest = q;
+            }
+
+        }
+            print("found data: " + closestDistance + " - " + closest);
+        if (closest != -1) {
+            print("\tFound");
+            CheckpointRecord @ rec = checkpointData[closest];
+            if (rec.checkpointId != -1) {
+                print("\t already found?!");
+            }
+            rec.checkpointId = i;
+            rec.pos += checkpoint.Position;
+        }
+    }
+    PrintCheckpointData();
+}
+
+void PrintCheckpointData(){
+            print("Print Data");
+    for (int i = 0; i < checkpointData.Length; i++) {
+        print(checkpointData[i].coord);
+        print(checkpointData[i].pos);
+    }
+}
+
+void GetTimeBasedOnCar(int checkpoint) {
+    return;
+//     CSmPlayer@ carPlayer = GetPlayer();
+// print(carPlayer.Score.BestLapTimes.Length);
+// return;
+    CSmScriptPlayer@ player = GetPlayerScript();
+    CTrackManiaScriptPlayer@ tmPlayer = cast<CTrackManiaScriptPlayer>(player);
+print(tmPlayer.CurRace.NbRespawns);
+    return;
+    vec3 carPos = player.Position;
+    vec3 carForward = player.AimDirection;
+    vec3 carUp = player.UpDirection;
+    float carSpeed = player.Speed * 3.6;
+    vec3 carVel = player.Velocity;
+
+    print(carPos);
+
+    vec3 carPoint = carPos + carForward*3;
+    print(carPoint);
+    print(carSpeed);
+    //print(carVel);
+
+    int checkpointIndex = -1;
+    for (int i = 0; i < checkpointData.Length; i++) {
+        if(checkpointData[i].checkpointId == checkpoint){
+            checkpointIndex = i;
+            break;
+        }
+    }
+    if(checkpointIndex == -1){
+        print("Failed to find checkpoint");
+        return;
+    }
+    print(checkpointData[checkpointIndex].pos);
+    print(checkpointData[checkpointIndex].pos - carPoint);
+
+    //target 1.964
 }
 
 void CreateOrUpdateCurrentTime(int checkpoint, int time) {
@@ -420,7 +576,7 @@ void UpdateSaveBestData() {
         //update our best times
         for (uint i = 0; i < currTimesRec.Length; i++) {
             if (currTimesRec[i].time < bestTimesRec[i].time) {
-                bestTimesRec[i].time = currTimesRec[i].time;
+                bestTimesRec[i] = currTimesRec[i];
             }
         }
 
@@ -462,6 +618,11 @@ CSmScriptPlayer@ GetPlayerScript() {
         return null;
     }
     return smPlayer.ScriptAPI;
+}
+
+CSmArenaClient@ GetPlayground() {
+    CSmArenaClient@ playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    return playground;
 }
 
 bool IsPlayerReady() {
@@ -514,7 +675,7 @@ int GetCurrentLap() {
 }
 
 string GetMapName() {
-    CSmArenaClient@ playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    CSmArenaClient@ playground = GetPlayground();
     if (playground is null || playground.Map is null) {
         return "";
     }
@@ -522,7 +683,7 @@ string GetMapName() {
 }
 
 string GetMapId() {
-    CSmArenaClient@ playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    CSmArenaClient@ playground = GetPlayground();
     if (playground is null || playground.Map is null) {
         return "";
     }
@@ -533,7 +694,10 @@ bool IsWaypointFinish(int index) {
     if (index == -1) {
         return false;
     }
-    auto playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    auto playground = GetPlayground();
+    if(playground is null){
+        return false;
+    }
     MwFastBuffer < CGameScriptMapLandmark@ > landmarks = playground.Arena.MapLandmarks;
     if (index >= int(landmarks.Length)) {
         return false;
@@ -550,7 +714,7 @@ bool IsWaypointValid(int index) {
     if (index == -1) {
         return false;
     }
-    auto playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    auto playground = GetPlayground();
     MwFastBuffer < CGameScriptMapLandmark@ > landmarks = playground.Arena.MapLandmarks;
     if (index >= int(landmarks.Length)) {
         return false;
@@ -581,7 +745,7 @@ void UpdateWaypoints() {
     array < int > links = {};
     bool strictMode = true;
 
-    auto playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    auto playground = GetPlayground();
     if (playground is null || playground.Arena is null || playground.Arena.Rules is null) {
         return;
     }
@@ -809,7 +973,8 @@ void Render() {
         }
     }
 
-    if (isDisplayingSomething && windowVisible && map!is null && map.MapInfo.MapUid != "" && app.Editor is null) {
+    //if (isDisplayingSomething && windowVisible && map!is null && map.MapInfo.MapUid != "" && app.Editor is null) {
+    if (isDisplayingSomething && windowVisible && map!is null && map.MapInfo.MapUid != "") {
         if (lockPosition) {
             UI::SetNextWindowPos(int(anchor.x), int(anchor.y), UI::Cond::Always);
         } else {
