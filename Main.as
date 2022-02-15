@@ -216,11 +216,8 @@ void Update(float dt) {
 
     //wait for the car to be back at starting checkpoint
     if (waitForCarReset) {
-        //when waiting for a reset, this will be the last value used (ie finish time)
-        //during a reset it's set to a random negative value
-        waitForCarReset = GetPlayerStartTime() >= 0;
-        //waitForCarReset = !IsWaypointStart(GetCurrentCheckpoint());
-        playerStartTime = GetPlayerStartTime();
+        //when waiting for a reset, Player race time ends up at a - value for the countdown before starting the lap
+        waitForCarReset = GetPlayerRaceTime() >= 0;
         return;
     }
 
