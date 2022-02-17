@@ -935,7 +935,7 @@ void Render() {
 
     //show theoretical after finishing all checkpoints
     bool shouldShowTheoretical = showTheoreticalBest && int(bestTimesRec.Length) == numCps;
-    bool shouldShowEstimated = showEstimated && int(bestTimesRec.Length) == numCps;
+    bool shouldShowEstimated = showEstimated && int(bestTimesRec.Length) == numCps && numCps > 0;
     bool shouldShowLastLapDelta = isMultiLap && numLaps != 1;
     //number of cols we show checkpoint data for
     int dataCols = 0;
@@ -1030,7 +1030,7 @@ void Render() {
 
             if (shouldShowEstimated) {
                 int time = 0;
-                if (currCP != 0 || !isMultiLap) {
+                if (currCP != 0 || !isMultiLap || int(currLapTimesRec.Length) != numCps) {
                     //UI::PushStyleColor(UI::Col::Text, vec4(255, 255, 255, 255));
                     lastEstimatedTime = CalulateEstimatedTime();
                 } else {
