@@ -271,6 +271,12 @@ void Update(float dt) {
         int deltaTime = raceTime - lastCpTime;
         lastCpTime = raceTime;
 
+        if (raceTime <= 0 || deltaTime <= 0) {
+            DebugText("Checkpoint time negative..");
+            waitForCarReset = true;
+            return;
+        }
+
         //if (isMultiLap && currentLap != 0) {
         //    int before = currTimesRec[currCP - 1].time;
         //    DebugText("Multi lap Comp: quicker? " + (before>deltaTime) + " " + Time::Format(before) + "/" + Time::Format(deltaTime));
@@ -1061,6 +1067,12 @@ void Render() {
 
         }
 
+        bool invalidRun = !isFinished && waitForCarReset;
+
+        if (invalidRun) {
+            UI::PushStyleColor(UI::Col::Text, vec4(255, 0, 0, 255));
+        }
+
 
         if (dataCols != 0 && UI::BeginTable("table", dataCols, UI::TableFlags::SizingFixedFit)) {
             //if (showHeader) {
@@ -1195,6 +1207,11 @@ void Render() {
 
             UI::EndTable();
         }
+
+        if (invalidRun) {
+            UI::PopStyleColor();
+        }
+
         UI::EndGroup();
 
         UI::End();
