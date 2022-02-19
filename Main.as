@@ -26,6 +26,9 @@ bool saveWhenCompleted = true;
 [Setting category="Options" name="Multi lap data override" description="should we let multi laps override our fastest time's (false will only use the first lap's time)"]
 bool multiLapOverride = true;
 
+//[Setting category="Options" name="Use new checkpoint time" description="times dont match what trackmania says, this aims to get a more accurate number"]
+bool newCheckpointTimes = false;
+
 [Setting category="Window Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
 bool showTheoreticalBest = true;
 
@@ -65,7 +68,6 @@ bool saveData = true;
 [Setting category="Data" name="Reset Data for Map" description="This will clear the best times for this map (does not delete file)"]
 bool resetMapData = false;
 
-
 //timing
 int lastCpTime = 0;
 //last waypoint cp id
@@ -90,12 +92,11 @@ class Record {
         this.time = time;
     }
 
-    Record@ opAssign(const Record &in record)
-	{
-		checkpointId = record.checkpointId;
-		time = record.time;
+    Record@ opAssign(const Record & in record) {
+        checkpointId = record.checkpointId;
+        time = record.time;
         return this;
-	}
+    }
 }
 
 //storage
@@ -200,7 +201,10 @@ void Update(float dt) {
 
             LoadFile();
 
-            //UpdateCheckpointData();
+            if (newCheckpointTimes) {
+                UpdateCheckpointData();
+            }
+
             UpdateWaypoints();
         }
     }
@@ -260,7 +264,9 @@ void Update(float dt) {
 
         int raceTime = GetPlayerRaceTime();
 
-        GetTimeBasedOnCar(cp);
+        if (newCheckpointTimes) {
+            GetTimeBasedOnCar(cp);
+        }
 
         int deltaTime = raceTime - lastCpTime;
         lastCpTime = raceTime;
@@ -270,10 +276,10 @@ void Update(float dt) {
         //    DebugText("Multi lap Comp: quicker? " + (before>deltaTime) + " " + Time::Format(before) + "/" + Time::Format(deltaTime));
         //}
 
-        //add our time
+        //add our time (best current time for run)
         CreateOrUpdateCurrentTime(cp, deltaTime);
 
-        //update one frame behind
+        //update our best times, different logic for multilap
         if (int(currLapTimesRec.Length) == numCps) {
             CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time);
         } else {
@@ -282,6 +288,7 @@ void Update(float dt) {
             }
         }
 
+        //update time for laps
         CreateOrUpdateCurrentLapTime(cp, deltaTime);
 
         currCP++;
@@ -327,17 +334,17 @@ class CheckpointRecord {
 CheckpointRecord@[] checkpointData;
 
 void UpdateCheckpointData() {
-    print("UpdateCheckpointData");
+    DebugText("UpdateCheckpointData");
     checkpointData = {};
     CSmArenaClient@ playground = GetPlayground();
     if (playground is null || playground.Map is null) {
         return;
     }
-    vec3 size = vec3(playground.Map.Size.x,playground.Map.Size.y,playground.Map.Size.z);
+    vec3 size = vec3(playground.Map.Size.x, playground.Map.Size.y, playground.Map.Size.z);
     const int blockSize = 32;
-    print("Size: " + size.ToString());
-    for (int i = 0; i < playground.Map.Blocks.Length; i++) {
-        CGameCtnBlock @ block = playground.Map.Blocks[i];
+    DebugText("Size: " + size.ToString());
+    for (uint i = 0; i < playground.Map.Blocks.Length; i++) {
+        CGameCtnBlock@ block = playground.Map.Blocks[i];
         if (block.WaypointSpecialProperty!is null || block.BlockInfo.WaypointType != CGameCtnBlockInfo::EWayPointType::None) {
             CheckpointRecord rec;
             rec.dir = block.Dir;
@@ -347,22 +354,22 @@ void UpdateCheckpointData() {
             checkpointData.InsertLast(rec);
 
             //for (int q = 0; q < block.BlockUnits.Length; q++) {
-            //    CGameCtnBlockUnit @ blockUnit = block.BlockUnits[q];
+            //    CGameCtnBlockUnit@ blockUnit = block.BlockUnits[q];
             //    for (int j = 0; j < blockUnit.BlockUnitModel.Clips_North.Length; j++) {
             //        if(blockUnit.BlockUnitModel.Clips_North[j] is null){
-            //            print("Null clip");
+            //            DebugText("Null clip");
             //            continue;
             //        }
             //        CGameCtnBlockInfoClip@ clip = blockUnit.BlockUnitModel.Clips_North[j];
             //        if (clip.HasPassingPoint) {
-            //            print("asdasdas");
+            //            DebugText("asdasdas");
             //        }
             //    }
             //}
         }
     }
     //if(playground.Arena.MapLandmarks.Length != checkpointData.Length){
-    //    print("Checkpoint lenths dont match");
+    //    DebugText("Checkpoint lenths dont match");
     //    return;
     //}
     //for (int i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
@@ -371,48 +378,48 @@ void UpdateCheckpointData() {
     //    rec.checkpointId = i;
     //    rec.pos = checkpoint.Position;
     //}
-    for (int q = 0; q < checkpointData.Length; q++) {
-        print("checkpointData coord " + checkpointData[q].coord.ToString());
+    for (uint q = 0; q < checkpointData.Length; q++) {
+        DebugText("checkpointData coord " + checkpointData[q].coord.ToString());
     }
-    for (int i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
+    for (uint i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
         CGameScriptMapLandmark@ checkpoint = playground.Arena.MapLandmarks[i];
-        print("MapLandmarks pos " + checkpoint.Position.ToString());
-        print("\t"+(checkpoint.Position/blockSize).ToString());
+        DebugText("MapLandmarks pos " + checkpoint.Position.ToString());
+        DebugText("\t" + (checkpoint.Position / blockSize).ToString());
     }
-    for (int i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
-        print(i);
-        CGameScriptMapLandmark @ checkpoint = playground.Arena.MapLandmarks[i];
+    for (uint i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
+        DebugText("" + i);
+        CGameScriptMapLandmark@ checkpoint = playground.Arena.MapLandmarks[i];
         vec3 coordPos = checkpoint.Position / blockSize;
         //coordPos.x -= 0.0;
         //coordPos.z -= 0.5;
-        print("\t" + coordPos.ToString());
+        DebugText("\t" + coordPos.ToString());
         coordPos.y = 0;
         int closest = -1;
         float closestDistance = 9999;
-                if(checkpoint.PlayerSpawn !is null){
-            print("\tcp skipped");
+        if (checkpoint.PlayerSpawn!is null) {
+            DebugText("\tcp skipped");
             continue;
         }
-        for (int q = 0; q < checkpointData.Length; q++) {
-            print(q);
+        for (uint q = 0; q < checkpointData.Length; q++) {
+            DebugText("" + q);
             vec3 checkPos = checkpointData[q].coord;
-            print("\t" + checkPos.ToString());
+            DebugText("\t" + checkPos.ToString());
             checkPos.y = 0;
-            //print(coordPos - checkPos);
+            //DebugText(coordPos - checkPos);
             float distance = (coordPos - checkPos).Length();
-            print("\t" + distance);
-            if(closestDistance > distance ){
+            DebugText("\t" + distance);
+            if (closestDistance > distance) {
                 closestDistance = distance;
                 closest = q;
             }
 
         }
-            print("found data: " + closestDistance + " - " + closest);
+        DebugText("found data: " + closestDistance + " - " + closest);
         if (closest != -1) {
-            print("\tFound");
-            CheckpointRecord @ rec = checkpointData[closest];
+            DebugText("\tFound");
+            CheckpointRecord@ rec = checkpointData[closest];
             if (rec.checkpointId != -1) {
-                print("\t already found?!");
+                DebugText("\t already found?!");
             }
             rec.checkpointId = i;
             rec.pos += checkpoint.Position;
@@ -421,49 +428,48 @@ void UpdateCheckpointData() {
     PrintCheckpointData();
 }
 
-void PrintCheckpointData(){
-            print("Print Data");
-    for (int i = 0; i < checkpointData.Length; i++) {
-        print(checkpointData[i].coord);
-        print(checkpointData[i].pos);
+void PrintCheckpointData() {
+    DebugText("Print Data");
+    for (uint i = 0; i < checkpointData.Length; i++) {
+        DebugText(checkpointData[i].coord.ToString());
+        DebugText(checkpointData[i].pos.ToString());
     }
 }
 
 void GetTimeBasedOnCar(int checkpoint) {
-    return;
-//     CSmPlayer@ carPlayer = GetPlayer();
-// print(carPlayer.Score.BestLapTimes.Length);
-// return;
+    //     CSmPlayer@ carPlayer = GetPlayer();
+    // DebugText(carPlayer.Score.BestLapTimes.Length);
+    // return;
     CSmScriptPlayer@ player = GetPlayerScript();
-    CTrackManiaScriptPlayer@ tmPlayer = cast<CTrackManiaScriptPlayer>(player);
-print(tmPlayer.CurRace.NbRespawns);
-    return;
+    //CTrackManiaScriptPlayer@ tmPlayer = cast < CTrackManiaScriptPlayer > (player);
+    //DebugText(tmPlayer.CurRace.NbRespawns);
+    //return;
     vec3 carPos = player.Position;
     vec3 carForward = player.AimDirection;
     vec3 carUp = player.UpDirection;
     float carSpeed = player.Speed * 3.6;
     vec3 carVel = player.Velocity;
 
-    print(carPos);
+    DebugText(carPos.ToString());
 
-    vec3 carPoint = carPos + carForward*3;
-    print(carPoint);
-    print(carSpeed);
-    //print(carVel);
+    vec3 carPoint = carPos + carForward * 3;
+    DebugText(carPoint.ToString());
+    DebugText("" + carSpeed);
+    //DebugText(carVel);
 
     int checkpointIndex = -1;
-    for (int i = 0; i < checkpointData.Length; i++) {
-        if(checkpointData[i].checkpointId == checkpoint){
+    for (int i = 0; i < int(checkpointData.Length); i++) {
+        if (checkpointData[i].checkpointId == checkpoint) {
             checkpointIndex = i;
             break;
         }
     }
-    if(checkpointIndex == -1){
-        print("Failed to find checkpoint");
+    if (checkpointIndex == -1) {
+        DebugText("Failed to find checkpoint");
         return;
     }
-    print(checkpointData[checkpointIndex].pos);
-    print(checkpointData[checkpointIndex].pos - carPoint);
+    DebugText(checkpointData[checkpointIndex].pos.ToString());
+    DebugText((checkpointData[checkpointIndex].pos - carPoint).ToString());
 
     //target 1.964
 }
@@ -551,7 +557,7 @@ void UpdatePersonalBestTimes() {
             CreateOrUpdatePBTime(currTimesRec[i].checkpointId, currTimesRec[i].time);
         }
         //Final checkpoint is finish, can have multiple finish checkpoints, so this overides that
-        pbTimesRec[currTimesRec.Length-1] = currTimesRec[currTimesRec.Length-1];
+        pbTimesRec[currTimesRec.Length - 1] = currTimesRec[currTimesRec.Length - 1];
     }
 }
 
@@ -695,7 +701,7 @@ bool IsWaypointFinish(int index) {
         return false;
     }
     auto playground = GetPlayground();
-    if(playground is null){
+    if (playground is null) {
         return false;
     }
     MwFastBuffer < CGameScriptMapLandmark@ > landmarks = playground.Arena.MapLandmarks;
