@@ -260,7 +260,6 @@ void Update(float dt) {
         lastCP = cp;
 
         int raceTime = GetPlayerRaceTime();
-        print(raceTime);
 
         if (newCheckpointTimes) {
             GetTimeBasedOnCar(cp);
@@ -274,11 +273,6 @@ void Update(float dt) {
             waitForCarReset = true;
             return;
         }
-
-        //if (isMultiLap && currentLap != 0) {
-        //    int before = currTimesRec[currCP - 1].time;
-        //    DebugText("Multi lap Comp: quicker? " + (before>deltaTime) + " " + Time::Format(before) + "/" + Time::Format(deltaTime));
-        //}
 
         //add our time (best current time for run)
         CreateOrUpdateCurrentTime(cp, deltaTime);
@@ -656,19 +650,10 @@ bool IsPlayerReady() {
         return false;
     }
     return GetPlayerRaceTime() >= 0 && smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver && GetSpawnCheckpoint() != -1;
-    //return smPlayerScript.EngineRpm >= 0 && smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver && GetSpawnCheckpoint() != -1;
 }
 
 int GetPlayerRaceTime() {
-    //CSmScriptPlayer@ smPlayerScript = GetPlayerScript();
-    //if (smPlayerScript is null) {
-    //    return -1;
-    //}
-    //if(UI::IsGameUIVisible()) {
-    //    return smPlayerScript.CurrentRaceTime;
-    //} else {
-        return GetCurrentGameTime() - GetPlayerStartTime();// - GetPlaygroundScript().SpawnInvulnerabilityDuration;
-    //}
+    return GetCurrentGameTime() - GetPlayerStartTime();
 }
 
 int GetPlayerStartTime() {
