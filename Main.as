@@ -62,6 +62,9 @@ bool showPBDelta = true;
 [Setting category="Window Options" name="Show personal best Color" description="Shows red on the PB times when it's below your pb"]
 bool showPBColor = true;
 
+[Setting category="Window Options" name="Show best to personal best Delta" description="Adds best to personal best delta to the window"]
+bool showBestPBDelta = false;
+
 [Setting category="Data" name="Save on disk" description="Stops saving data to disk - When this is disabled you will be able to load old data"]
 bool saveData = true;
 
@@ -974,6 +977,9 @@ void Render() {
     }
     if (showPBDelta) {
         dataCols++;
+    } 
+    if (showBestPBDelta) {
+        dataCols++;
     }
 
     bool isDisplayingSomething = shouldShowEstimated || shouldShowTheoretical || dataCols != 0;
@@ -1120,6 +1126,11 @@ void Render() {
                     UI::TableNextColumn();
                     SetMinWidth(deltaWidth);
                     UI::Text("PB. Delta");
+                } 
+                if (showBestPBDelta) {
+                    UI::TableNextColumn();
+                    SetMinWidth(deltaWidth);
+                    UI::Text("B-PB. Delta");
                 }
             }
 
@@ -1197,6 +1208,17 @@ void Render() {
                             int delta = currLapTimesRec[i].time - pbTimesRec[i].time;
                             DrawDeltaText(delta);
                         }
+                    }
+                    if (showBestPBDelta) {
+                        UI::TableNextColumn();
+                        int compTime = pbTimesRec[i].time;
+                        //if (currTimesRec.Length > i) {
+                        //    if (compTime > currTimesRec[i].time) {
+                        //        compTime = currTimesRec[i].time;
+                        //    }
+                        //}
+                        int delta = compTime - bestTimesRec[i].time;
+                        DrawDeltaText(delta);
                     }
                 } else {
                     UI::TableNextColumn();
