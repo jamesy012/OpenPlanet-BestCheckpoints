@@ -234,12 +234,13 @@ void Update(float dt) {
         if (IsPlayerReady()) {
             DebugText("Running reset");
             resetData = false;
-
             UpdateSaveBestData();
 
             ResetRace();
 
             playerStartTime = GetActualPlayerStartTime();
+
+            //lastCpTime = GetPlayerRaceTime();
 
             if (numCps == 0) {
                 UpdateWaypoints();
@@ -257,6 +258,7 @@ void Update(float dt) {
         }
     }
 
+
     int cp = GetCurrentCheckpoint();
 
     //have we changed checkpoint?
@@ -266,6 +268,7 @@ void Update(float dt) {
         lastCP = cp;
 
         int raceTime = GetPlayerRaceTime();
+        print(raceTime);
 
         if (newCheckpointTimes) {
             GetTimeBasedOnCar(cp);
@@ -619,8 +622,28 @@ int GetLowestTime(uint checkpoint) {
     return -1;
 }
 
+CSmArenaClient@ GetPlayground() {
+    CSmArenaClient@ playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
+    return playground;
+}
+
+CSmArenaRulesMode@ GetPlaygroundScript() {
+    CSmArenaRulesMode@ playground = cast < CSmArenaRulesMode > (GetApp().PlaygroundScript);
+    return playground;
+}
+
+int GetCurrentGameTime() {
+    CSmArenaClient@ playground = GetPlayground();
+    if (playground is null || playground.Interface is null || playground.Interface.ManialinkScriptHandler is null) {
+        return -1;
+    }
+    //CSmArenaInterfaceManialinkScripHandler@ aimsh = cast<CSmArenaInterfaceManialinkScripHandler>(playground.Interface.ManialinkScriptHandler );
+    //return aimsh.ArenaNow; 
+    return playground.Interface.ManialinkScriptHandler.GameTime;
+}
+
 CSmPlayer@ GetPlayer() {
-    auto playground = GetApp().CurrentPlayground;
+    CSmArenaClient@ playground = GetPlayground();
     if (playground is null || playground.GameTerminals.Length != 1) {
         return null;
     }
@@ -635,25 +658,25 @@ CSmScriptPlayer@ GetPlayerScript() {
     return smPlayer.ScriptAPI;
 }
 
-CSmArenaClient@ GetPlayground() {
-    CSmArenaClient@ playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
-    return playground;
-}
-
 bool IsPlayerReady() {
     CSmScriptPlayer@ smPlayerScript = GetPlayerScript();
     if (smPlayerScript is null) {
         return false;
     }
-    return smPlayerScript.CurrentRaceTime >= 0 && smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver && GetSpawnCheckpoint() != -1;
+    return GetPlayerRaceTime() >= 0 && smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver && GetSpawnCheckpoint() != -1;
+    //return smPlayerScript.EngineRpm >= 0 && smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver && GetSpawnCheckpoint() != -1;
 }
 
 int GetPlayerRaceTime() {
-    CSmScriptPlayer@ smPlayerScript = GetPlayerScript();
-    if (smPlayerScript is null) {
-        return -1;
-    }
-    return smPlayerScript.CurrentRaceTime;
+    //CSmScriptPlayer@ smPlayerScript = GetPlayerScript();
+    //if (smPlayerScript is null) {
+    //    return -1;
+    //}
+    //if(UI::IsGameUIVisible()) {
+    //    return smPlayerScript.CurrentRaceTime;
+    //} else {
+        return GetCurrentGameTime() - GetPlayerStartTime();// - GetPlaygroundScript().SpawnInvulnerabilityDuration;
+    //}
 }
 
 int GetPlayerStartTime() {
@@ -665,11 +688,7 @@ int GetPlayerStartTime() {
 }
 
 int GetActualPlayerStartTime() {
-    CSmScriptPlayer@ smPlayerScript = GetPlayerScript();
-    if (smPlayerScript is null) {
-        return -1;
-    }
-    return smPlayerScript.StartTime - smPlayerScript.CurrentRaceTime;
+    return GetPlayerStartTime() - GetPlayerRaceTime();
 }
 
 
@@ -986,7 +1005,7 @@ void Render() {
 
     if (hideWithIFace) {
         auto playground = app.CurrentPlayground;
-        if (playground is null || playground.Interface is null || UI::IsGameUIVisible()) {
+        if (playground is null || playground.Interface is null || !UI::IsGameUIVisible()) {
             return;
         }
     }
@@ -1043,6 +1062,7 @@ void Render() {
                     }
                     UI::Text("~" + Time::Format(theoreticalBest));
                 }
+
 
             }
 
