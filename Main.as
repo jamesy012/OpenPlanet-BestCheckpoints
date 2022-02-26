@@ -35,6 +35,9 @@ bool showTheoreticalBest = true;
 [Setting category="Window Options" name="Show estimated time (experimental)" description="Adds estimated finish time to the window header"]
 bool showEstimated = false;
 
+[Setting category="Window Options" name="Show stored personal best" description="Show the personal best time the plugin has stored (if using the plugin after already playing a map these values wont match up)"]
+bool showPersonalBest = false;
+
 [Setting category="Window Options" name="Show checkpoints" description="Adds a number to the left for each checkpoint in the map"]
 bool showCheckpoints = true;
 
@@ -970,6 +973,7 @@ void Render() {
     //show theoretical after finishing all checkpoints
     bool shouldShowTheoretical = showTheoreticalBest && int(bestTimesRec.Length) == numCps;
     bool shouldShowEstimated = showEstimated && int(bestTimesRec.Length) == numCps && numCps > 0;
+    bool shouldShowPersonalBest = showPersonalBest && pbTime != 0;
     bool shouldShowLastLapDelta = isMultiLap && numLaps != 1;
     //number of cols we show checkpoint data for
     int dataCols = 0;
@@ -1001,7 +1005,7 @@ void Render() {
         dataCols++;
     }
 
-    bool isDisplayingSomething = shouldShowEstimated || shouldShowTheoretical || dataCols != 0;
+    bool isDisplayingSomething = shouldShowEstimated || shouldShowTheoretical || shouldShowPersonalBest || dataCols != 0;
 
     if (hideWithIFace) {
         auto playground = app.CurrentPlayground;
@@ -1039,30 +1043,27 @@ void Render() {
         //    UI::EndTable();
         //}
 
-        if (UI::BeginTable("info", 4, UI::TableFlags::SizingFixedFit)) {
+        if (UI::BeginTable("info", 2, UI::TableFlags::SizingFixedFit)) {
 
             if (shouldShowTheoretical) {
                 UI::TableNextColumn();
-                SetMinWidth(timeWidth);
-                UI::Text("Theoretical");
+                string text = "Theoretical: ";
+                //show lowest if we have finished or on a seperate lap
+                bool shouldShowLowest = isFinished || (currentLap != 0);
 
-                UI::TableNextColumn(); {
-                    //show lowest if we have finished or on a seperate lap
-                    bool shouldShowLowest = isFinished || (currentLap != 0);
-
-                    int theoreticalBest = 0;
-                    for (uint i = 0; i < bestTimesRec.Length; i++) {
-                        //if we have finished then grab the best of both times
-                        //this is possibly bad, maybe only grab the lowest time anyway>
-                        if (shouldShowLowest) {
-                            theoreticalBest += GetLowestTime(i);
-                        } else {
-                            theoreticalBest += bestTimesRec[i].time;
-                        }
+                int theoreticalBest = 0;
+                for (uint i = 0; i < bestTimesRec.Length; i++) {
+                    //if we have finished then grab the best of both times
+                    //this is possibly bad, maybe only grab the lowest time anyway>
+                    if (shouldShowLowest) {
+                        theoreticalBest += GetLowestTime(i);
+                    } else {
+                        theoreticalBest += bestTimesRec[i].time;
                     }
-                    UI::Text("~" + Time::Format(theoreticalBest));
                 }
+                text += "~" + Time::Format(theoreticalBest);
 
+                UI::Text(text);
 
             }
 
@@ -1080,13 +1081,18 @@ void Render() {
 
                 if (time != 0) {
                     UI::TableNextColumn();
-                    UI::Text("Estimated");
-                    UI::TableNextColumn();
-
-                    UI::Text("~" + Time::Format(time));
-
+                    string text = "Estimated: ";
+                    text += "~" + Time::Format(time);
+                    UI::Text(text);
                 }
                 //UI::PopStyleColor();
+            }
+
+            if (shouldShowPersonalBest) {
+                UI::TableNextColumn();
+                string text = "PB: ";
+                text += Time::Format(pbTime);
+                UI::Text(text);
             }
 
             UI::EndTable();
