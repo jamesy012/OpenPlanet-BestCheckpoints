@@ -214,17 +214,6 @@ void Update(float dt) {
             UpdateWaypoints();
         }
     }
-
-    //fileio reset
-    if (resetMapData) {
-        DebugText("saved data reset");
-        resetMapData = false;
-
-        ResetCommon();
-
-        SaveFile();
-    }
-
     //wait for the car to be back at starting checkpoint
     if (waitForCarReset) {
         //when waiting for a reset, Player race time ends up at a - value for the countdown before starting the lap
@@ -954,6 +943,17 @@ void SaveFile() {
     }
 
     Json::ToFile(jsonFile, jsonData);
+}
+
+void OnSettingsChanged() {
+    if (resetMapData) {
+        DebugText("saved data reset");
+        resetMapData = false;
+
+        ResetCommon();
+
+        SaveFile();
+    }
 }
 
 //modified https://github.com/Phlarx/tm-ultimate-medals
