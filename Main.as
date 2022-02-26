@@ -1055,10 +1055,10 @@ void Render() {
             if (shouldShowEstimated) {
                 int time = 0;
                 if (currCP != 0 || !isMultiLap || int(currLapTimesRec.Length) != numCps) {
-                    //UI::PushStyleColor(UI::Col::Text, vec4(255, 255, 255, 255));
+                    //UI::PushStyleColor(UI::Col::Text, vec4(1.0, 1.0, 1.0, 1.0));
                     lastEstimatedTime = CalulateEstimatedTime();
                 } else {
-                    //UI::PushStyleColor(UI::Col::Text, vec4(128, 128, 255, 255));
+                    //UI::PushStyleColor(UI::Col::Text, vec4(0.5, 0.5, 1.0, 1.0));
                     //last checkpoint delta off
                     time = currLapTimesRec[numCps - 1].time - bestTimesRec[numCps - 1].time;
                 }
@@ -1087,7 +1087,7 @@ void Render() {
         bool invalidRun = !isFinished && waitForCarReset;
 
         if (invalidRun) {
-            UI::PushStyleColor(UI::Col::Text, vec4(255, 0, 0, 255));
+            UI::PushStyleColor(UI::Col::Text, vec4(1.0, 0.0, 0.0, 1.0));
         }
 
 
@@ -1203,9 +1203,9 @@ void Render() {
                         //colors here are useless?
                         if (showPBColor && isFinished) {
                             if (isPBFaster) {
-                                UI::PushStyleColor(UI::Col::Text, vec4(255, 255, 255, 255));
+                                UI::PushStyleColor(UI::Col::Text, vec4(1.0, 1.0, 1.0, 1.0));
                             } else {
-                                UI::PushStyleColor(UI::Col::Text, vec4(255, 0, 0, 255));
+                                UI::PushStyleColor(UI::Col::Text, vec4(1.0, 0.0, 0.0, 1.0));
                             }
                         }
                         UI::Text(Time::Format(pbTimesRec[i].time));
@@ -1253,12 +1253,17 @@ void Render() {
     }
 }
 
+vec4 lerpMap(float t, float min, float max, vec4 minCol, vec4 maxCol) {
+    float value = (t-min) / (max-min);
+    return Math::Lerp(minCol, maxCol, value);
+}
+
 void DrawDeltaText(int delta) {
     if (delta > 0) {
-        UI::PushStyleColor(UI::Col::Text, vec4(255, 0, 0, 255));
+        UI::PushStyleColor(UI::Col::Text,lerpMap(delta,0,50,vec4(1.0, 0.8, 0.0, 1.0),vec4(1.0, 0.0, 0.0, 1.0)));
         UI::Text("+" + Time::Format(delta));
     } else {
-        UI::PushStyleColor(UI::Col::Text, vec4(0, 255, 0, 255));
+        UI::PushStyleColor(UI::Col::Text,lerpMap(delta,-100,0,vec4(0.0, 1.0, 0.0, 1.0),vec4(0.5, 1.0, 0.5, 1.0)));
         UI::Text("-" + Time::Format(-delta));
     }
     UI::PopStyleColor();
