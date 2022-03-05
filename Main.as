@@ -137,7 +137,6 @@ Json::Value jsonData = Json::Object();
 string jsonVersion = "1.2";
 
 //ui timing
-int lastLapTime = 0;
 int lastEstimatedTime = 0;
 
 void DebugText(string text) {
@@ -177,7 +176,6 @@ void ResetRace() {
     currentLap = 0;
     currCP = 0;
     finishRaceTime = 0;
-    lastLapTime = 0;
 }
 
 void Update(float dt) {
@@ -207,17 +205,13 @@ void Update(float dt) {
 
             LoadFile();
 
-            if (newCheckpointTimes) {
-                UpdateCheckpointData();
-            }
-
             UpdateWaypoints();
         }
     }
     //wait for the car to be back at starting checkpoint
     if (waitForCarReset) {
         //when waiting for a reset, Player race time ends up at a - value for the countdown before starting the lap
-        waitForCarReset = GetPlayerRaceTime() >= 0;
+        waitForCarReset = GetCurrentPlayerRaceTime() >= 0;
         return;
     }
 
@@ -231,8 +225,6 @@ void Update(float dt) {
             ResetRace();
 
             playerStartTime = GetActualPlayerStartTime();
-
-            //lastCpTime = GetPlayerRaceTime();
 
             if (numCps == 0) {
                 UpdateWaypoints();
@@ -259,11 +251,10 @@ void Update(float dt) {
 
         lastCP = cp;
 
-        int raceTime = GetPlayerRaceTime();
 
-        if (newCheckpointTimes) {
-            GetTimeBasedOnCar(cp);
-        }
+        int raceTime = GetPlayerCheckpointTime();
+
+
 
         int deltaTime = raceTime - lastCpTime;
         lastCpTime = raceTime;
@@ -293,7 +284,6 @@ void Update(float dt) {
 
         //check for finish
         if (IsWaypointFinish(cp)) {
-            lastLapTime = Time::get_Now();
             currentLap++;
             if (isMultiLap) {
                 DebugText("Lap finish: " + currentLap + "/" + numLaps);
@@ -305,7 +295,7 @@ void Update(float dt) {
                 waitForCarReset = true;
                 resetData = true;
                 isFinished = true;
-                finishRaceTime = GetPlayerRaceTime();
+                finishRaceTime = raceTime;
                 if (pbTime == 0) {
                     UpdatePersonalBestTimes();
                 }
@@ -316,160 +306,6 @@ void Update(float dt) {
         }
 
     }
-}
-
-class CheckpointRecord {
-    //CGameScriptMapLandmark data
-    int checkpointId = -1;
-    vec3 pos;
-
-    //CGameCtnBlock data
-    CGameCtnBlock::ECardinalDirections dir;
-    vec3 coord;
-    CGameCtnBlockInfo::EWayPointType type;
-}
-
-CheckpointRecord@[] checkpointData;
-
-void UpdateCheckpointData() {
-    DebugText("UpdateCheckpointData");
-    checkpointData = {};
-    CSmArenaClient@ playground = GetPlayground();
-    if (playground is null || playground.Map is null) {
-        return;
-    }
-    vec3 size = vec3(playground.Map.Size.x, playground.Map.Size.y, playground.Map.Size.z);
-    const int blockSize = 32;
-    DebugText("Size: " + size.ToString());
-    for (uint i = 0; i < playground.Map.Blocks.Length; i++) {
-        CGameCtnBlock@ block = playground.Map.Blocks[i];
-        if (block.WaypointSpecialProperty!is null || block.BlockInfo.WaypointType != CGameCtnBlockInfo::EWayPointType::None) {
-            CheckpointRecord rec;
-            rec.dir = block.Dir;
-            rec.coord = vec3(block.CoordX, block.CoordY, block.CoordZ);
-            rec.type = block.BlockInfo.WayPointType;
-            rec.pos = block.BlockModel.VariantBaseGround.SpawnTrans / 2;
-            checkpointData.InsertLast(rec);
-
-            //for (int q = 0; q < block.BlockUnits.Length; q++) {
-            //    CGameCtnBlockUnit@ blockUnit = block.BlockUnits[q];
-            //    for (int j = 0; j < blockUnit.BlockUnitModel.Clips_North.Length; j++) {
-            //        if(blockUnit.BlockUnitModel.Clips_North[j] is null){
-            //            DebugText("Null clip");
-            //            continue;
-            //        }
-            //        CGameCtnBlockInfoClip@ clip = blockUnit.BlockUnitModel.Clips_North[j];
-            //        if (clip.HasPassingPoint) {
-            //            DebugText("asdasdas");
-            //        }
-            //    }
-            //}
-        }
-    }
-    //if(playground.Arena.MapLandmarks.Length != checkpointData.Length){
-    //    DebugText("Checkpoint lenths dont match");
-    //    return;
-    //}
-    //for (int i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
-    //    CGameScriptMapLandmark@ checkpoint = playground.Arena.MapLandmarks[i];
-    //    CheckpointRecord@ rec = checkpointData[i];
-    //    rec.checkpointId = i;
-    //    rec.pos = checkpoint.Position;
-    //}
-    for (uint q = 0; q < checkpointData.Length; q++) {
-        DebugText("checkpointData coord " + checkpointData[q].coord.ToString());
-    }
-    for (uint i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
-        CGameScriptMapLandmark@ checkpoint = playground.Arena.MapLandmarks[i];
-        DebugText("MapLandmarks pos " + checkpoint.Position.ToString());
-        DebugText("\t" + (checkpoint.Position / blockSize).ToString());
-    }
-    for (uint i = 0; i < playground.Arena.MapLandmarks.Length; i++) {
-        DebugText("" + i);
-        CGameScriptMapLandmark@ checkpoint = playground.Arena.MapLandmarks[i];
-        vec3 coordPos = checkpoint.Position / blockSize;
-        //coordPos.x -= 0.0;
-        //coordPos.z -= 0.5;
-        DebugText("\t" + coordPos.ToString());
-        coordPos.y = 0;
-        int closest = -1;
-        float closestDistance = 9999;
-        if (checkpoint.PlayerSpawn!is null) {
-            DebugText("\tcp skipped");
-            continue;
-        }
-        for (uint q = 0; q < checkpointData.Length; q++) {
-            DebugText("" + q);
-            vec3 checkPos = checkpointData[q].coord;
-            DebugText("\t" + checkPos.ToString());
-            checkPos.y = 0;
-            //DebugText(coordPos - checkPos);
-            float distance = (coordPos - checkPos).Length();
-            DebugText("\t" + distance);
-            if (closestDistance > distance) {
-                closestDistance = distance;
-                closest = q;
-            }
-
-        }
-        DebugText("found data: " + closestDistance + " - " + closest);
-        if (closest != -1) {
-            DebugText("\tFound");
-            CheckpointRecord@ rec = checkpointData[closest];
-            if (rec.checkpointId != -1) {
-                DebugText("\t already found?!");
-            }
-            rec.checkpointId = i;
-            rec.pos += checkpoint.Position;
-        }
-    }
-    PrintCheckpointData();
-}
-
-void PrintCheckpointData() {
-    DebugText("Print Data");
-    for (uint i = 0; i < checkpointData.Length; i++) {
-        DebugText(checkpointData[i].coord.ToString());
-        DebugText(checkpointData[i].pos.ToString());
-    }
-}
-
-void GetTimeBasedOnCar(int checkpoint) {
-    //     CSmPlayer@ carPlayer = GetPlayer();
-    // DebugText(carPlayer.Score.BestLapTimes.Length);
-    // return;
-    CSmScriptPlayer@ player = GetPlayerScript();
-    //CTrackManiaScriptPlayer@ tmPlayer = cast < CTrackManiaScriptPlayer > (player);
-    //DebugText(tmPlayer.CurRace.NbRespawns);
-    //return;
-    vec3 carPos = player.Position;
-    vec3 carForward = player.AimDirection;
-    vec3 carUp = player.UpDirection;
-    float carSpeed = player.Speed * 3.6;
-    vec3 carVel = player.Velocity;
-
-    DebugText(carPos.ToString());
-
-    vec3 carPoint = carPos + carForward * 3;
-    DebugText(carPoint.ToString());
-    DebugText("" + carSpeed);
-    //DebugText(carVel);
-
-    int checkpointIndex = -1;
-    for (int i = 0; i < int(checkpointData.Length); i++) {
-        if (checkpointData[i].checkpointId == checkpoint) {
-            checkpointIndex = i;
-            break;
-        }
-    }
-    if (checkpointIndex == -1) {
-        DebugText("Failed to find checkpoint");
-        return;
-    }
-    DebugText(checkpointData[checkpointIndex].pos.ToString());
-    DebugText((checkpointData[checkpointIndex].pos - carPoint).ToString());
-
-    //target 1.964
 }
 
 void CreateOrUpdateCurrentTime(int checkpoint, int time) {
@@ -649,11 +485,28 @@ bool IsPlayerReady() {
     if (smPlayerScript is null) {
         return false;
     }
-    return GetPlayerRaceTime() >= 0 && smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver && GetSpawnCheckpoint() != -1;
+    return GetCurrentPlayerRaceTime() >= 0 && smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver && GetSpawnCheckpoint() != -1;
 }
 
-int GetPlayerRaceTime() {
+//current time for race
+//not accurate for ui
+int GetCurrentPlayerRaceTime() {
     return GetCurrentGameTime() - GetPlayerStartTime();
+}
+
+//chooses between GetUICheckpointTime or GetCurrentPlayerRaceTime
+//called directly after a checkpoint changed
+int GetPlayerCheckpointTime() {
+    int raceTime;
+    int estRaceTime = GetCurrentPlayerRaceTime();
+    int uiRaceTime = GetUICheckpointTime();
+    if (uiRaceTime == -1) {
+        raceTime = estRaceTime;
+    } else {
+        raceTime = uiRaceTime;
+    }
+    //print("ui: " + Time::Format(uiRaceTime) + " - norm: " + Time::Format(raceTime));
+    return raceTime;
 }
 
 int GetPlayerStartTime() {
@@ -665,9 +518,95 @@ int GetPlayerStartTime() {
 }
 
 int GetActualPlayerStartTime() {
-    return GetPlayerStartTime() - GetPlayerRaceTime();
+    return GetPlayerStartTime() - GetCurrentPlayerRaceTime();
 }
 
+int GetUICheckpointTime() {
+    CGameCtnNetwork@ network = GetApp().Network;
+    if (network is null) {
+        return -1;
+    }
+    CGameManiaAppPlayground@ appPlayground = network.ClientManiaAppPlayground;
+    if (appPlayground is null) {
+        return -1;
+    }
+
+    //search? instead of hardcode?
+    CGameUILayer@ raceUILayer = appPlayground.UILayers[8];
+    if (raceUILayer is null) {
+        return -1;
+    }
+    CGameManialinkPage@ linkPage = raceUILayer.LocalPage;
+    if (linkPage is null) {
+        return -1;
+    }
+    CGameManialinkControl@ race_Checkpoint = linkPage.GetClassChildren_Result[0];
+    if (race_Checkpoint is null || race_Checkpoint.ControlId != "Race_Checkpoint") { //validation
+        return -1;
+    }
+    CGameManialinkControl@ frame_checkpoint = cast < CGameManialinkFrame > (race_Checkpoint).Controls[0];
+    if (frame_checkpoint is null) {
+        return -1;
+    }
+    CGameManialinkControl@ frame_race = cast < CGameManialinkFrame > (frame_checkpoint).Controls[0];
+    if (frame_race is null) {
+        return -1;
+    }
+    CGameManialinkControl@ frame_race_time = cast < CGameManialinkFrame > (frame_race).Controls[0];
+    if (frame_race_time is null || cast < CGameManialinkFrame > (frame_race_time).Controls.Length != 2) {
+        return -1;
+    }
+    CGameManialinkControl@ label_race_time_ctrl = cast < CGameManialinkFrame > (frame_race_time).Controls[1];
+    if (label_race_time_ctrl is null) {
+        return -1;
+    }
+    CGameManialinkLabel@ label_race_time = cast < CGameManialinkLabel > (label_race_time_ctrl);
+    if (label_race_time is null) {
+        return -1;
+    }
+    //print(label_race_time.Value);
+
+    return ConvertStringToTime(label_race_time.Value);
+}
+
+int ConvertStringToTime(string input) {
+    string[] seconds = SplitString(input, ":");
+    if (seconds.Length != 2) {
+        return -1;
+    }
+    string[] microSecond = SplitString(seconds[1], ".");
+    if (microSecond.Length != 2) {
+        return -1;
+    }
+    int micro = Text::ParseInt(microSecond[1]);
+    int second = Text::ParseInt(microSecond[0]);
+    int minute = Text::ParseInt(seconds[0]);
+    second *= 1000;
+    minute *= 1000 * 60;
+    int result = micro + second + minute;
+    //print(Time::Format(1000));
+    //print(Time::Format(result));
+    return result;
+}
+
+//splits strings, removes split character
+string[] SplitString(string input, string split) {
+    //how to just pass a char??
+    string current = "";
+    string[] output;
+    for (int i = 0; i < input.Length; i++) {
+        if (input[i] == split[0]) {
+            output.InsertLast(current);
+            current = "";
+        } else {
+            //how to do just add a char?
+            current += " ";
+            current[current.Length - 1] = input[i];
+        }
+    }
+    output.InsertLast(current);
+    return output;
+}
 
 int GetCurrentCheckpoint() {
     CSmPlayer@ smPlayer = GetPlayer();
@@ -1285,3 +1224,40 @@ void LoadFont() {
         }
     }
 }
+
+
+//UIModule_Race_TimeGap
+//Network
+//ClientManiaAppPlayground
+//UILayers
+//10
+//LocalPage
+//GetClassChidren_Result
+//Frame 0
+//Controls 0
+//Frame 0
+//Control
+//childs 0
+//childs 0 
+//childs 1
+//childs 3 (bottom right time diff window 4th player down)
+
+//UIModule_Race_Checkpoint
+//Network
+//ClientManiaAppPlayground
+//UILayers
+//8
+//LocalPage
+//GetClassChidren_Result
+//Frame 0
+//Controls 0
+//Frame 0
+//Controls 0
+//Frame 0
+//Controls 0
+//Frame 0
+//Controls 0
+//Frame 0
+//Controls 0
+//controls 1 (label)
+
