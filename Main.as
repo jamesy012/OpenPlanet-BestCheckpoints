@@ -26,8 +26,8 @@ bool saveWhenCompleted = true;
 [Setting category="Options" name="Multi lap data override" description="should we let multi laps override our fastest time's (false will only use the first lap's time)"]
 bool multiLapOverride = true;
 
-//[Setting category="Options" name="Use new checkpoint time" description="times dont match what trackmania says, this aims to get a more accurate number"]
-bool newCheckpointTimes = false;
+[Setting category="Options" name="Compare to current lap (multi lap)" description="current times for delta calulation should use the current lap times or the best lap times from this run "]
+bool shouldCompareToCurrentLap = false;
 
 [Setting category="Window Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
 bool showTheoreticalBest = true;
@@ -41,7 +41,10 @@ bool showPersonalBest = false;
 [Setting category="Window Options" name="Show checkpoints" description="Adds a number to the left for each checkpoint in the map"]
 bool showCheckpoints = true;
 
-[Setting category="Window Options" name="Show current times" description="Adds current times to the window"]
+[Setting category="Window Options" name="Show current best times" description="Adds current best times to the window"]
+bool showCurrentBest = false;
+
+[Setting category="Window Options" name="Show current lap times (multi lap)" description="Adds current times to the window"]
 bool showCurrent = false;
 
 [Setting category="Window Options" name="Show last lap Times (multi lap)" description="Adds last lap time to the window (only for multi lap)"]
@@ -890,6 +893,11 @@ void Render() {
     //    auto map = app.Challenge;
     //#endif
 
+    bool invalidRun = !isFinished && waitForCarReset;
+
+    if (invalidRun) {
+        UI::PushStyleColor(UI::Col::Text, vec4(1.0, 0.0, 0.0, 1.0));
+    }
 
     int timeWidth = 53;
     int deltaWidth = 60;
@@ -902,6 +910,9 @@ void Render() {
     //number of cols we show checkpoint data for
     int dataCols = 0;
     if (showCheckpoints) {
+        dataCols++;
+    }
+    if(showCurrentBest){
         dataCols++;
     }
     if (showCurrent) {
@@ -1023,12 +1034,6 @@ void Render() {
 
         }
 
-        bool invalidRun = !isFinished && waitForCarReset;
-
-        if (invalidRun) {
-            UI::PushStyleColor(UI::Col::Text, vec4(1.0, 0.0, 0.0, 1.0));
-        }
-
 
         if (dataCols != 0 && UI::BeginTable("table", dataCols, UI::TableFlags::SizingFixedFit)) {
             //if (showHeader) {
@@ -1037,6 +1042,12 @@ void Render() {
                     UI::TableNextColumn();
                     SetMinWidth(0);
                     UI::Text("Cp");
+                }
+
+                if(showCurrentBest){
+                    UI::TableNextColumn();
+                    SetMinWidth(timeWidth);
+                    UI::Text("Current B.");
                 }
 
                 if (showCurrent) {
@@ -1096,6 +1107,13 @@ void Render() {
                     UI::Text("" + (i + 1));
                 }
 
+                if(showCurrentBest){
+                    UI::TableNextColumn();
+                    if (currTimesRec.Length > i) {
+                        UI::Text(Time::Format(currTimesRec[i].time));
+                    }
+                }
+
                 if (showCurrent) {
                     UI::TableNextColumn();
                     if (currLapTimesRec.Length > i) {
@@ -1112,8 +1130,8 @@ void Render() {
                     }
                     if (showLastLapDelta) {
                         UI::TableNextColumn();
-                        if (currentLap != 0 && currLapTimesRec.Length > i && lastLapTimesRec.Length > i && lastLapTimesRec[i].time != -1) {
-                            int delta = currLapTimesRec[i].time - lastLapTimesRec[i].time;
+                        if (currentLap != 0 && isCurrentCPValid(i) && lastLapTimesRec.Length > i && lastLapTimesRec[i].time != -1) {
+                            int delta = getCurrentCPTime(i) - lastLapTimesRec[i].time;
                             DrawDeltaText(delta);
                         }
                     }
@@ -1128,8 +1146,8 @@ void Render() {
                 }
                 if (showBestDelta) {
                     UI::TableNextColumn();
-                    if (bestTimesRec.Length > i && currLapTimesRec.Length > i) {
-                        int delta = currLapTimesRec[i].time - bestTimesRec[i].time;
+                    if (bestTimesRec.Length > i && isCurrentCPValid(i)) {
+                        int delta = getCurrentCPTime(i) - bestTimesRec[i].time;
                         DrawDeltaText(delta);
                     }
                 }
@@ -1154,8 +1172,8 @@ void Render() {
                     }
                     if (showPBDelta) {
                         UI::TableNextColumn();
-                        if (currTimesRec.Length > i) {
-                            int delta = currLapTimesRec[i].time - pbTimesRec[i].time;
+                        if (isCurrentCPValid(i)) {
+                            int delta = getCurrentCPTime(i) - pbTimesRec[i].time;
                             DrawDeltaText(delta);
                         }
                     }
@@ -1180,16 +1198,17 @@ void Render() {
             UI::EndTable();
         }
 
-        if (invalidRun) {
-            UI::PopStyleColor();
-        }
-
         UI::EndGroup();
 
         UI::End();
 
         UI::PopFont();
     }
+
+    if (invalidRun) {
+        UI::PopStyleColor();
+    }
+
 }
 
 vec4 lerpMap(float t, float min, float max, vec4 minCol, vec4 maxCol) {
@@ -1208,6 +1227,25 @@ void DrawDeltaText(int delta) {
     UI::PopStyleColor();
 }
 
+bool isCurrentCPValid(uint index) {
+    if (shouldCompareToCurrentLap) {
+        return currLapTimesRec.Length > index;
+    } else {
+        return currTimesRec.Length > index;
+    }
+}
+
+int getCurrentCPTime(int index) {
+    if (isCurrentCPValid(index)) { //useless check?
+        if (shouldCompareToCurrentLap) {
+            return currLapTimesRec[index].time;
+        } else {
+            return currTimesRec[index].time;
+        }
+    }
+    return -1;
+}
+
 void SetMinWidth(int width) {
     UI::PushStyleVar(UI::StyleVar::ItemSpacing, vec2(0, 0));
     UI::Dummy(vec2(width, 0));
@@ -1217,7 +1255,7 @@ void SetMinWidth(int width) {
 void LoadFont() {
     string fontFaceToLoad = fontFace.Length == 0 ? "DroidSans.ttf" : fontFace;
     if (fontFaceToLoad != loadedFontFace || fontSize != loadedFontSize) {
-       @font = Resources::GetFont(fontFaceToLoad, fontSize);
+        @font = Resources::GetFont(fontFaceToLoad, fontSize);
         if (font!is null) {
             loadedFontFace = fontFaceToLoad;
             loadedFontSize = fontSize;
