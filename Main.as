@@ -26,14 +26,18 @@ bool saveWhenCompleted = true;
 [Setting category="Options" name="Multi lap data override" description="should we let multi laps override our fastest time's (false will only use the first lap's time)"]
 bool multiLapOverride = true;
 
+[Setting category="Options" name="Estimated time update" description="Should the estimated time display update during a run?"]
+bool updatingEstimatedTime = true;
+
 [Setting category="Options" name="Compare to current lap (multi lap)" description="current times for delta calulation should use the current lap times or the best lap times from this run "]
 bool shouldCompareToCurrentLap = false;
 
 [Setting category="Window Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
 bool showTheoreticalBest = true;
 
-[Setting category="Window Options" name="Show estimated time (experimental)" description="Adds estimated finish time to the window header"]
+[Setting category="Window Options" name="Show estimated time" description="Adds estimated finish time to the window header"]
 bool showEstimated = false;
+
 
 [Setting category="Window Options" name="Show stored personal best" description="Show the personal best time the plugin has stored (if using the plugin after already playing a map these values wont match up)"]
 bool showPersonalBest = false;
@@ -747,17 +751,26 @@ int CalulateEstimatedTime() {
     if (int(bestTimesRec.Length) != numCps) {
         return 0;
     }
-    int theoreticalBest = 0;
+    int currentFinishTime = 0;
+    int currentLapTime = 0;
     for (int i = 0; i < int(bestTimesRec.Length); i++) {
         if (currCP > i) {
-            theoreticalBest += currLapTimesRec[i].time;
+            currentFinishTime += currLapTimesRec[i].time;
+            currentLapTime += currLapTimesRec[i].time;
         } else {
-            theoreticalBest += bestTimesRec[i].time;
-
+            currentFinishTime += bestTimesRec[i].time;
         }
     }
 
-    return theoreticalBest;
+    if (updatingEstimatedTime && int(bestTimesRec.Length) > currCP && !isFinished && !waitForCarReset && GetCurrentPlayerRaceTime() > 0) {
+        currentLapTime += bestTimesRec[currCP].time;
+        if (currentLapTime < GetCurrentPlayerRaceTime()) {
+            int different = GetCurrentPlayerRaceTime() - currentLapTime;
+            currentFinishTime += different;
+        }
+    }
+
+    return currentFinishTime;
 }
 
 //file io
