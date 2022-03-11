@@ -36,8 +36,7 @@ bool shouldCompareToCurrentLap = false;
 bool showTheoreticalBest = true;
 
 [Setting category="Window Options" name="Show estimated time" description="Adds estimated finish time to the window header"]
-bool showEstimated = false;
-
+bool showEstimated = true;
 
 [Setting category="Window Options" name="Show stored personal best" description="Show the personal best time the plugin has stored (if using the plugin after already playing a map these values wont match up)"]
 bool showPersonalBest = false;
@@ -762,6 +761,7 @@ int CalulateEstimatedTime() {
         }
     }
 
+    //problem here in multiplayer matched when they end the cars timer keeps going up
     if (updatingEstimatedTime && int(bestTimesRec.Length) > currCP && !isFinished && !waitForCarReset && GetCurrentPlayerRaceTime() > 0) {
         currentLapTime += bestTimesRec[currCP].time;
         if (currentLapTime < GetCurrentPlayerRaceTime()) {
