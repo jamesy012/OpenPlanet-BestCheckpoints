@@ -24,6 +24,8 @@ Turbo and Maniaplanet support
 
 added some option toggles for delta time colours
 
+plugin stability
+
 ## 1.3
 
 Few bug fixes from github issues
