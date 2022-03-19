@@ -1,6 +1,6 @@
 # Best Checkpoints
 
-Version 1.3
+Version 1.4
 
 Compare your checkpoint times to your current run
 
@@ -17,6 +17,12 @@ By default it only updates your best times when you finish a run With an option 
 Saves your best times to load whenever you come back to the map
 
 # Updates
+
+## 1.4
+
+Turbo and Maniaplanet support
+
+added some option toggles for delta time colours
 
 ## 1.3
 
