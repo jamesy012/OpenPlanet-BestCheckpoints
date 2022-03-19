@@ -1,5 +1,5 @@
 // openplanet doesnt like comments on same line as #if statement?
-//just here for visual studio code intellisense help
+// just here for visual studio code intellisense help
 #if __INTELLISENSE__
 #include "Settings.as"
 #include "cppIntellisense.h"
@@ -1332,15 +1332,31 @@ vec4 lerpMap(float t, float min, float max, vec4 minCol, vec4 maxCol) {
 }
 
 void DrawDeltaText(int delta) {
-  if (delta > 0) {
-    UI::PushStyleColor(UI::Col::Text,
-                       lerpMap(delta, 0, 50, vec4(1.0, 0.8, 0.0, 1.0),
-                               vec4(1.0, 0.0, 0.0, 1.0)));
-    UI::Text("+" + Time::Format(delta));
+  int scale = 1;
+  if (!shouldDeltaLerpColor) {
+    scale *= 0;
+  }
+  vec4 negDelta;
+  vec4 negDeltaLight;
+  if (shouldDeltaBeBlue) {
+    negDelta = vec4(0.35, 0.35, 1.0, 1.0);
+    negDeltaLight = vec4(0.5, 0.5, 1.0, 1.0);
+    // negDelta = negDeltaLight;
   } else {
-    UI::PushStyleColor(UI::Col::Text,
-                       lerpMap(delta, -100, 0, vec4(0.0, 1.0, 0.0, 1.0),
-                               vec4(0.5, 1.0, 0.5, 1.0)));
+    negDelta = vec4(0.0, 1.0, 0.0, 1.0);
+    negDeltaLight = vec4(0.5, 1.0, 0.5, 1.0);
+  }
+  if (delta > 0) {
+    UI::PushStyleColor(UI::Col::Text, lerpMap(delta, 0, 100 * scale + 1,
+                                              vec4(1.0, 0.4, 0.4, 1.0),
+                                              vec4(1.0, 0.0, 0.0, 1.0)));
+    UI::Text("+" + Time::Format(delta));
+  } else if (delta == 0) {
+    UI::PushStyleColor(UI::Col::Text, negDelta);
+    UI::Text("-" + Time::Format(-delta));
+  } else {
+    UI::PushStyleColor(UI::Col::Text, lerpMap(delta, -100 * scale - 1, 0,
+                                              negDelta, negDeltaLight));
     UI::Text("-" + Time::Format(-delta));
   }
   UI::PopStyleColor();

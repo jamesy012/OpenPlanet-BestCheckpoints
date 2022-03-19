@@ -34,6 +34,12 @@ bool updatingEstimatedTime = true;
 [Setting category="Options" name="Compare to current lap (multi lap)" description="current times for delta calulation should use the current lap times or the best lap times from this run "]
 bool shouldCompareToCurrentLap = false;
 
+[Setting category="Options" name="Should Delta have a color lerp" description="makes delta values closer to 0 be slightly lighter"]
+bool shouldDeltaLerpColor = true;
+
+[Setting category="Options" name="Should negatiive delta be blue" description="changes the negative delta from green to blue"]
+bool shouldDeltaBeBlue = false;
+
 [Setting category="Window Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
 bool showTheoreticalBest = true;
 
