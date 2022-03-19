@@ -46,7 +46,7 @@ bool showTheoreticalBest = true;
 [Setting category="Window Options" name="Show estimated time" description="Adds estimated finish time to the window header"]
 bool showEstimated = true;
 
-[Setting category="Window Options" name="Show stored personal best" description="Show the personal best time the plugin has stored (if using the plugin after already playing a map these values wont match up)"]
+[Setting category="Window Options" name="Show map personal best time" description="Show the personal best time the plugin has stored (if using the plugin after already playing a map these values wont match up)"]
 bool showPersonalBest = false;
 
 [Setting category="Window Options" name="Show checkpoints" description="Adds a number to the left for each checkpoint in the map"]
@@ -81,6 +81,9 @@ bool showPBColor = true;
 
 [Setting category="Window Options" name="Show best to personal best Delta" description="Adds best to personal best delta to the window"]
 bool showBestPBDelta = false;
+
+[Setting category="Window Options" name="Quick MultiLap Enable" description="turns on a few windows that are useful for multilap"]
+bool quickMultiLapEnable = false;
 
 [Setting category="Data" name="Save on disk" description="Stops saving data to disk - When this is disabled you will be able to load old data"]
 bool saveData = true;

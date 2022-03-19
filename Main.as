@@ -998,6 +998,7 @@ void SaveFile() {
   Json::ToFile(jsonFile, jsonData);
 }
 
+bool quickMultiLapEnableCache = false;
 void OnSettingsChanged() {
   if (resetMapData) {
     DebugText("saved data reset");
@@ -1007,6 +1008,24 @@ void OnSettingsChanged() {
 
     SaveFile();
   }
+
+  {
+    // has option changed
+    if (quickMultiLapEnableCache != quickMultiLapEnable) {
+      showCurrentBest = showCurrent = showLastLap = showLastLapDelta =
+          quickMultiLapEnable;
+    }
+
+    // has any of the options it turns on changed?
+    bool quickMultiLap =
+        showCurrentBest && showCurrent && showLastLap && showLastLapDelta;
+    if (quickMultiLapEnableCache != quickMultiLap) {
+      quickMultiLapEnable = quickMultiLap;
+    }
+  }
+
+  // update quick
+  quickMultiLapEnableCache = quickMultiLapEnable;
 }
 
 // modified https://github.com/Phlarx/tm-ultimate-medals
