@@ -101,7 +101,7 @@ void ResetCommon() {
 
   hasFinishedMap = false;
 
-#if TURBO
+#if TURBO || MP4
   // map load will set this or we count as we checkpoint
   numCps = 0;
 #endif
@@ -119,7 +119,7 @@ void ResetRace() {
 
 #if TMNEXT
   lastCP = GetSpawnCheckpoint();
-#elif TURBO
+#elif TURBO || MP4
   turboCheckpointCounter = 0;
   lastCurrCheckpointRaceTime = uint(-1);
 #endif
@@ -161,7 +161,7 @@ void Update(float dt) {
     // when waiting for a reset, Player race time ends up at a - value for the
     // countdown before starting the lap
     waitForCarReset = GetCurrentPlayerRaceTime() >= 0;
-#elif TURBO
+#elif TURBO || MP4
     waitForCarReset = IsPlayerReady();
 #endif
     return;
@@ -191,20 +191,20 @@ void Update(float dt) {
       DebugText("Car no longer valid..");
       resetData = true;
 
-      // turbo needs to go through one more time
-#if !TURBO
+      // turbo/MP4 needs to go through one more time
+#if !TURBO && !MP4
       return;
 #endif
     }
   }
 
-#if TURBO
+#if TURBO || MP4
   // turbo doesnt store current checkpoint?
   UpdateCheckpointCounter();
 #endif
 
   int cp = GetCurrentCheckpoint();
-#if TURBO
+#if TURBO || MP4
   cp -= (currentLap * (numCps));
 #endif
 
@@ -228,7 +228,7 @@ void Update(float dt) {
       // not sure if this is necessary anymore?
 #if TMNEXT
       waitForCarReset = true;
-#elif TURBO
+#elif TURBO || MP4
       ResetRace();
 #endif
       return;
@@ -237,7 +237,7 @@ void Update(float dt) {
     // add our time (best current time for run)
     CreateOrUpdateCurrentTime(cp, deltaTime);
 
-#if TURBO
+#if TURBO || MP4
     print(cp + " > " + numCps);
     if (hasFinishedMap == false && cp > numCps) {
       numCps++;  // turbo Temp
@@ -262,7 +262,7 @@ void Update(float dt) {
     // check for finish
 #if TMNEXT
     if (IsWaypointFinish(cp)) {
-#elif TURBO
+#elif TURBO || MP4
     print("Laps: " + GetPlayerLap() + " - " + currentLap);
     if (IsPlayerFinished() || GetPlayerLap() != currentLap) {
       print("Finish lap");
@@ -277,7 +277,7 @@ void Update(float dt) {
 
 #if TMNEXT
       if (!isMultiLap || currentLap == numLaps || !multiLapOverride) {
-#elif TURBO
+#elif TURBO || MP4
       if (IsPlayerFinished()) {
 #endif
         DebugText("Race Finished");
@@ -440,7 +440,7 @@ CSmArenaClient @GetPlayground() {
   CSmArenaClient @playground = cast<CSmArenaClient>(GetApp().CurrentPlayground);
   return playground;
 }
-#elif TURBO
+#elif TURBO || MP4
 CTrackManiaRaceNew @GetPlayground() {
   CTrackManiaRaceNew @playground =
       cast<CTrackManiaRaceNew>(GetApp().CurrentPlayground);
@@ -475,7 +475,7 @@ CSmPlayer @GetPlayer() {
 
   return cast<CSmPlayer>(playground.GameTerminals[0].GUIPlayer);
 }
-#elif TURBO
+#elif TURBO || MP4
 CTrackManiaPlayer @GetPlayer() {
   auto playground = GetPlayground();
   if (playground is null || playground.GameTerminals.Length != 1) {
@@ -485,7 +485,7 @@ CTrackManiaPlayer @GetPlayer() {
 }
 #endif
 
-#if TURBO
+#if TURBO || MP4
 bool IsPlayerReady() {
   CTrackManiaPlayer @smPlayer = GetPlayer();
   if (smPlayer is null) {
@@ -534,7 +534,7 @@ int GetPlayerCheckpointTime() {
   // print("ui: " + Time::Format(uiRaceTime) + " - norm: " +
   // Time::Format(raceTime));
   return raceTime;
-#elif TURBO
+#elif TURBO || MP4
   CTrackManiaPlayer @smPlayer = GetPlayer();
   return smPlayer.CurCheckpointRaceTime;
 #endif
@@ -548,13 +548,18 @@ int GetPlayerStartTime() {
   }
   return smPlayer.StartTime;
 }
-#elif TURBO
+#elif TURBO || MP4
 int GetPlayerStartTime() {
   CTrackManiaPlayer @smPlayer = GetPlayer();
   if (smPlayer is null) {
     return -1;
   }
+
+#if MP4
+  return smPlayer.ScriptAPI.RaceStartTime;
+#else
   return smPlayer.RaceStartTime;
+#endif
 }
 #endif
 
@@ -671,12 +676,11 @@ int GetCurrentCheckpoint() {
 }
 
 string GetMapName() {
-#if TMNEXT
-  auto playground = GetPlayground();
-  if (playground is null || playground.Map is null) {
+#if TMNEXT || MP4
+  if (GetApp().RootMap is null) {
     return "";
   }
-  return playground.Map.MapName;
+  return GetApp().RootMap.MapName;
 #elif TURBO
   auto map = GetApp().Challenge;
   if (map is null) {
@@ -687,12 +691,11 @@ string GetMapName() {
 }
 
 string GetMapId() {
-#if TMNEXT
-  auto playground = GetPlayground();
-  if (playground is null || playground.Map is null) {
+#if TMNEXT || MP4
+  if (GetApp().RootMap is null) {
     return "";
   }
-  return playground.Map.IdName;
+  return GetApp().RootMap.IdName;
 #elif TURBO
   auto map = GetApp().Challenge;
   if (map is null) {
@@ -763,7 +766,7 @@ void UpdateWaypoints() {
   array<int> links = {};
   bool strictMode = true;
 
-#if TMNEXT || MP4
+#if TMNEXT
   auto playground = GetPlayground();
   if (playground is null || playground.Arena is null ||
       playground.Arena.Rules is null) {
@@ -771,6 +774,8 @@ void UpdateWaypoints() {
   }
 
   auto map = playground.Map;
+#elif MP4
+  auto map = GetApp().RootMap;
 #elif TURBO
   auto map = GetApp().Challenge;
   if (map is null) {
@@ -819,7 +824,7 @@ void UpdateWaypoints() {
 #endif
 }
 
-#if TURBO
+#if TURBO || MP4
 void UpdateCheckpointCounter() {
   CTrackManiaPlayer @smPlayer = cast<CTrackManiaPlayer>(GetPlayer());
   if (smPlayer is null) {
