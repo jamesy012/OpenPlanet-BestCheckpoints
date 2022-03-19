@@ -1058,12 +1058,6 @@ void Render() {
     auto map = app.Challenge;
 #endif
 
-    bool invalidRun = !isFinished && waitForCarReset;
-
-    if (invalidRun) {
-        UI::PushStyleColor(UI::Col::Text, vec4(1.0, 0.0, 0.0, 1.0));
-    }
-
     int timeWidth = 53;
     int deltaWidth = 60;
 
@@ -1112,6 +1106,12 @@ void Render() {
         if (playground is null || playground.Interface is null || !UI::IsGameUIVisible()) {
             return;
         }
+    }
+    
+    bool invalidRun = !isFinished && waitForCarReset;
+
+    if (invalidRun) {
+        UI::PushStyleColor(UI::Col::Text, vec4(1.0, 0.0, 0.0, 1.0));
     }
 
     //if (isDisplayingSomething && windowVisible && map!is null && map.MapInfo.MapUid != "" && app.Editor is null) {
