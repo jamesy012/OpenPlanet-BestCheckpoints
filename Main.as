@@ -18,7 +18,7 @@ string fontFace = "";
 int fontSize = 16;
 
 [Setting category="Options" name="Enable Logging" description="will start logging text to get an idea about what the programs doing"]
-bool enableLogging = false;
+bool enableLogging = true;
 
 [Setting category="Options" name="Save on run complete" description="Only stores/updates best times when a run is finished."]
 bool saveWhenCompleted = true;
@@ -140,10 +140,16 @@ Resources::Font@ font = null;
 //file io
 string jsonFile = '';
 Json::Value jsonData = Json::Object();
-string jsonVersion = "1.2";
+string jsonVersion = "1.3";
 
 //ui timing
 int lastEstimatedTime = 0;
+
+
+//turbo extra's
+bool hasFinishedMap = false;
+int turboCheckpointCounter = 0;
+uint lastCurrCheckpointRaceTime = uint(-1);
 
 void DebugText(string text) {
     if (enableLogging) {
@@ -170,6 +176,8 @@ void ResetCommon() {
     pbTimesRec = {};
     pbTime = 0;
     jsonData = Json::Object();
+
+    hasFinishedMap = false;
 }
 
 void ResetRace() {
@@ -177,11 +185,18 @@ void ResetRace() {
     currLapTimesRec = {};
     lastLapTimesRec = {};
     isFinished = false;
-    lastCP = GetSpawnCheckpoint();
     lastCpTime = 0;
     currentLap = 0;
     currCP = 0;
     finishRaceTime = 0;
+
+
+#if NEXT
+    lastCP = GetSpawnCheckpoint();
+#elif TURBO
+    turboCheckpointCounter = 0;
+    lastCurrCheckpointRaceTime = uint(-1);
+#endif
 }
 
 void Update(float dt) {
@@ -216,8 +231,12 @@ void Update(float dt) {
     }
     //wait for the car to be back at starting checkpoint
     if (waitForCarReset) {
+#if NEXT
         //when waiting for a reset, Player race time ends up at a - value for the countdown before starting the lap
         waitForCarReset = GetCurrentPlayerRaceTime() >= 0;
+#elif TURBO
+        waitForCarReset = IsPlayerReady();
+#endif
         return;
     }
 
@@ -244,38 +263,63 @@ void Update(float dt) {
         if (!IsPlayerReady()) {
             DebugText("Car no longer valid..");
             resetData = true;
+
+            //turbo needs to go through one more time
+#if !TURBO
             return;
+#endif
         }
     }
 
+#if TURBO
+    //turbo doesnt store current checkpoint?
+    UpdateCheckpointCounter();
+#endif
 
     int cp = GetCurrentCheckpoint();
+#if TURBO
+    cp -= (currentLap*(numCps));
+#endif
 
     //have we changed checkpoint?
     if (cp != lastCP) {
-        DebugText("Checkpoint change " + lastCP + "/" + cp);
+        DebugText("- Checkpoint change " + lastCP + "/" + cp);
 
         lastCP = cp;
-
 
         int raceTime = GetPlayerCheckpointTime();
 
 
-
         int deltaTime = raceTime - lastCpTime;
+
+        print("Delta time: " + deltaTime);
+        print("Race time: " + raceTime);
+
         lastCpTime = raceTime;
 
         if (raceTime <= 0 || deltaTime <= 0) {
             DebugText("Checkpoint time negative..");
+#if NEXT //not sure if this is necessary anymore?
             waitForCarReset = true;
+#elif TURBO
+            ResetRace();
+#endif
             return;
         }
 
         //add our time (best current time for run)
         CreateOrUpdateCurrentTime(cp, deltaTime);
 
+#if TURBO
+    print(cp + " > " + numCps );
+    if( hasFinishedMap == false && cp > numCps){
+        numCps++; //turbo Temp
+        print("adding CP");
+    }
+#endif
+
         //update our best times, different logic for multilap
-        if (int(currLapTimesRec.Length) == numCps) {
+        if (int(currLapTimesRec.Length) == numCps && currentLap != 0) {
             CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time);
         } else {
             if (int(bestTimesRec.Length) != numCps) {
@@ -289,13 +333,26 @@ void Update(float dt) {
         currCP++;
 
         //check for finish
+#if NEXT
         if (IsWaypointFinish(cp)) {
+#elif TURBO
+        print("Laps: " + GetPlayerLap() + " - " + currentLap);
+        if (IsPlayerFinished() || GetPlayerLap() != currentLap) {
+            print("Finish lap");
+            //turboCheckpointCounter = 0;
+            lastCP = 0;
+#endif
+            hasFinishedMap = true;
             currentLap++;
             if (isMultiLap) {
                 DebugText("Lap finish: " + currentLap + "/" + numLaps);
             }
 
+#if NEXT
             if (!isMultiLap || currentLap == numLaps || !multiLapOverride) {
+#elif TURBO
+            if(IsPlayerFinished()) {
+#endif
                 DebugText("Race Finished");
 
                 waitForCarReset = true;
@@ -450,10 +507,17 @@ int GetLowestTime(uint checkpoint) {
     return -1;
 }
 
+#if NEXT
 CSmArenaClient@ GetPlayground() {
     CSmArenaClient@ playground = cast < CSmArenaClient > (GetApp().CurrentPlayground);
     return playground;
 }
+#elif TURBO
+CTrackManiaRaceNew@ GetPlayground() {
+    CTrackManiaRaceNew@ playground = cast < CTrackManiaRaceNew > (GetApp().CurrentPlayground);
+    return playground;
+}
+#endif
 
 CSmArenaRulesMode@ GetPlaygroundScript() {
     CSmArenaRulesMode@ playground = cast < CSmArenaRulesMode > (GetApp().PlaygroundScript);
@@ -461,7 +525,7 @@ CSmArenaRulesMode@ GetPlaygroundScript() {
 }
 
 int GetCurrentGameTime() {
-    CSmArenaClient@ playground = GetPlayground();
+    auto playground = GetPlayground();
     if (playground is null || playground.Interface is null || playground.Interface.ManialinkScriptHandler is null) {
         return -1;
     }
@@ -470,14 +534,34 @@ int GetCurrentGameTime() {
     return playground.Interface.ManialinkScriptHandler.GameTime;
 }
 
+#if NEXT
 CSmPlayer@ GetPlayer() {
-    CSmArenaClient@ playground = GetPlayground();
+    auto playground = GetPlayground();
     if (playground is null || playground.GameTerminals.Length != 1) {
         return null;
     }
+
     return cast < CSmPlayer > (playground.GameTerminals[0].GUIPlayer);
 }
+#elif TURBO
+CTrackManiaPlayer@ GetPlayer() {
+    auto playground = GetPlayground();
+    if (playground is null || playground.GameTerminals.Length != 1) {
+        return null;
+    }
+    return cast < CTrackManiaPlayer > (playground.GameTerminals[0].ControlledPlayer);
+#endif
+}
 
+#if TURBO
+bool IsPlayerReady() {
+    CTrackManiaPlayer@ smPlayer = GetPlayer();
+    if (smPlayer is null) {
+        return false;
+    }
+    return smPlayer.RaceState == CTrackManiaPlayer::ERaceState::Running;
+}
+#else
 CSmScriptPlayer@ GetPlayerScript() {
     CSmPlayer@ smPlayer = GetPlayer();
     if (smPlayer is null) {
@@ -493,6 +577,7 @@ bool IsPlayerReady() {
     }
     return GetCurrentPlayerRaceTime() >= 0 && smPlayerScript.Post == CSmScriptPlayer::EPost::CarDriver && GetSpawnCheckpoint() != -1;
 }
+#endif
 
 //current time for race
 //not accurate for ui
@@ -503,6 +588,7 @@ int GetCurrentPlayerRaceTime() {
 //chooses between GetUICheckpointTime or GetCurrentPlayerRaceTime
 //called directly after a checkpoint changed
 int GetPlayerCheckpointTime() {
+#if NEXT
     int raceTime;
     int estRaceTime = GetCurrentPlayerRaceTime();
     int uiRaceTime = GetUICheckpointTime();
@@ -513,8 +599,13 @@ int GetPlayerCheckpointTime() {
     }
     //print("ui: " + Time::Format(uiRaceTime) + " - norm: " + Time::Format(raceTime));
     return raceTime;
+#elif TURBO
+    CTrackManiaPlayer@ smPlayer = GetPlayer();
+    return smPlayer.CurCheckpointRaceTime;
+#endif
 }
 
+#if NEXT
 int GetPlayerStartTime() {
     CSmPlayer@ smPlayer = GetPlayer();
     if (smPlayer is null) {
@@ -522,11 +613,21 @@ int GetPlayerStartTime() {
     }
     return smPlayer.StartTime;
 }
+#elif TURBO
+int GetPlayerStartTime() {
+    CTrackManiaPlayer@ smPlayer = GetPlayer();
+    if (smPlayer is null) {
+        return -1;
+    }
+    return smPlayer.RaceStartTime;
+}
+#endif
 
 int GetActualPlayerStartTime() {
     return GetPlayerStartTime() - GetCurrentPlayerRaceTime();
 }
 
+#if NEXT
 int GetUICheckpointTime() {
     CGameCtnNetwork@ network = GetApp().Network;
     if (network is null) {
@@ -574,6 +675,7 @@ int GetUICheckpointTime() {
 
     return ConvertStringToTime(label_race_time.Value);
 }
+#endif
 
 int ConvertStringToTime(string input) {
     string[] seconds = SplitString(input, ":");
@@ -615,37 +717,44 @@ string[] SplitString(string input, string split) {
 }
 
 int GetCurrentCheckpoint() {
+#if NEXT
     CSmPlayer@ smPlayer = GetPlayer();
     if (smPlayer is null) {
         return -1;
     }
     return smPlayer.CurrentLaunchedRespawnLandmarkIndex;
-}
-
-int GetCurrentLap() {
-    CSmPlayer@ smPlayer = GetPlayer();
-    if (smPlayer is null) {
-        return -1;
-    }
-    return smPlayer.CurrentLaunchedRespawnLandmarkIndex;
+#else
+    return turboCheckpointCounter;
+#endif
 }
 
 string GetMapName() {
-    CSmArenaClient@ playground = GetPlayground();
+#if NEXT
+    auto playground = GetPlayground();
     if (playground is null || playground.Map is null) {
         return "";
     }
     return playground.Map.MapName;
+#elif TURBO
+    auto map = GetApp().Challenge;    
+    return map.MapInfo.NameForUi;
+#endif
 }
 
 string GetMapId() {
-    CSmArenaClient@ playground = GetPlayground();
+#if NEXT
+    auto playground = GetPlayground();
     if (playground is null || playground.Map is null) {
         return "";
     }
     return playground.Map.IdName;
+#elif TURBO
+    auto map = GetApp().Challenge;    
+    return map.MapInfo.MapUid;
+#endif
 }
 
+#if NEXT
 bool IsWaypointFinish(int index) {
     if (index == -1) {
         return false;
@@ -692,25 +801,32 @@ int GetSpawnCheckpoint() {
     }
     return smPlayer.SpawnIndex;
 }
+#endif
 
 void UpdateWaypoints() {
+#if NEXT //turbo gets from save file/during a run
     numCps = 1; //one for finish
+#endif
     numLaps = 1;
     isMultiLap = false;
 
     array < int > links = {};
     bool strictMode = true;
 
+#if TMNEXT || MP4
     auto playground = GetPlayground();
     if (playground is null || playground.Arena is null || playground.Arena.Rules is null) {
         return;
     }
 
-    CGameCtnChallenge@ map = playground.Map;
+    auto map = playground.Map;
+#elif TURBO
+    auto map = GetApp().Challenge;
+#endif
     numLaps = map.TMObjective_NbLaps;
     isMultiLap = map.TMObjective_IsLapRace;
     DebugText("Map Laps: " + numLaps + " Is MultiLap: " + isMultiLap);
-
+#if NEXT
     MwFastBuffer < CGameScriptMapLandmark@ > landmarks = playground.Arena.MapLandmarks;
     for (uint i = 0; i < landmarks.Length; i++) {
         if (landmarks[i].Waypoint is null) {
@@ -743,8 +859,38 @@ void UpdateWaypoints() {
             strictMode = false;
         }
     }
-
+#endif
 }
+
+#if TURBO
+void UpdateCheckpointCounter(){
+    CTrackManiaPlayer@ smPlayer = cast<CTrackManiaPlayer>(GetPlayer());
+    if (smPlayer is null) {
+        return;
+    }
+    if(smPlayer.CurCheckpointRaceTime != lastCurrCheckpointRaceTime) {
+        turboCheckpointCounter++;
+        lastCurrCheckpointRaceTime = smPlayer.CurCheckpointRaceTime;
+    }
+}
+
+bool IsPlayerFinished() {
+    CTrackManiaPlayer@ smPlayer = cast<CTrackManiaPlayer>(GetPlayer());
+    if (smPlayer is null) {
+        return false;
+    }
+    return smPlayer.RaceState == CTrackManiaPlayer::ERaceState::Finished;
+}
+
+int GetPlayerLap() {
+    CTrackManiaPlayer@ smPlayer = cast<CTrackManiaPlayer>(GetPlayer());
+    if (smPlayer is null) {
+        return -1;
+    }
+    return smPlayer.CurrentNbLaps;
+}
+
+#endif
 
 int CalulateEstimatedTime() {
     if (int(bestTimesRec.Length) != numCps) {
@@ -810,11 +956,16 @@ void LoadFile() {
 
     if (jsonData.HasKey("version") && jsonData.HasKey("size")) {
         string version = jsonData["version"];
-        if (version == jsonVersion || version == "1.1") {
+        float versionFloat = Text::ParseFloat(version);
+        if (version == jsonVersion || version == "1.2" || version == "1.1") {
 
             numCps = jsonData["size"];
-            if (version == "1.2") {
+            if (versionFloat >= 1.2) {
                 pbTime = jsonData["pb"];
+            }
+            if (versionFloat >= 1.3) {
+                hasFinishedMap = jsonData["finished"];
+                print("loaded finished map " + hasFinishedMap);
             }
             for (int i = 0; i < numCps; i++) {
                 string key = "" + i;
@@ -824,7 +975,7 @@ void LoadFile() {
                         CreateOrUpdateBestTime(-1, jsonData[key]);
                     } else { //current
                         CreateOrUpdateBestTime(jsonData[key]["cp"], jsonData[key]["time"]);
-                        if (version == "1.2") {
+                        if (versionFloat >= 1.2) {
                             CreateOrUpdatePBTime(jsonData[key]["cp"], jsonData[key]["pbTime"]);
                         }
                     }
@@ -872,6 +1023,7 @@ void SaveFile() {
 
     jsonData["size"] = bestTimesRec.Length;
     jsonData["pb"] = pbTime;
+    jsonData["finished"] = hasFinishedMap;
 
 
     for (uint i = 0; i < bestTimesRec.Length; i++) {
@@ -900,11 +1052,11 @@ void OnSettingsChanged() {
 void Render() {
     auto app = cast < CTrackMania > (GetApp());
 
-    //#if TMNEXT || MP4
+#if TMNEXT || MP4
     auto map = app.RootMap;
-    //#elif TURBO
-    //    auto map = app.Challenge;
-    //#endif
+#elif TURBO
+    auto map = app.Challenge;
+#endif
 
     bool invalidRun = !isFinished && waitForCarReset;
 
@@ -917,7 +1069,7 @@ void Render() {
 
     //show theoretical after finishing all checkpoints
     bool shouldShowTheoretical = showTheoreticalBest && int(bestTimesRec.Length) == numCps;
-    bool shouldShowEstimated = showEstimated && int(bestTimesRec.Length) == numCps && numCps > 0;
+    bool shouldShowEstimated = showEstimated && int(bestTimesRec.Length) == numCps && numCps > 0 && !isMultiLap;
     bool shouldShowPersonalBest = showPersonalBest && pbTime != 0;
     bool shouldShowLastLapDelta = isMultiLap && numLaps != 1;
     //number of cols we show checkpoint data for
@@ -1143,8 +1295,8 @@ void Render() {
                     }
                     if (showLastLapDelta) {
                         UI::TableNextColumn();
-                        if (currentLap != 0 && isCurrentCPValid(i) && lastLapTimesRec.Length > i && lastLapTimesRec[i].time != -1) {
-                            int delta = getCurrentCPTime(i) - lastLapTimesRec[i].time;
+                        if (currentLap != 0 && isCurrentCPValid(i) && currLapTimesRec.Length > i && currLapTimesRec[i].time != -1 && lastLapTimesRec.Length > i && lastLapTimesRec[i].time != -1) {
+                            int delta = currLapTimesRec[i].time - lastLapTimesRec[i].time;
                             DrawDeltaText(delta);
                         }
                     }
