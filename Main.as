@@ -69,6 +69,7 @@ string jsonVersion = "1.3";
 
 // ui timing
 int lastEstimatedTime = 0;
+bool isRenderingCurrentCheckpoint = false;
 
 // turbo extra's
 bool hasFinishedMap = false;
@@ -1255,6 +1256,13 @@ void Render() {
       for (uint i = 0; i < bestTimesRec.Length; i++) {
         UI::TableNextRow();
 
+        isRenderingCurrentCheckpoint =
+            (int(i) == currCP && !invalidRun && darkenCurrentLap);
+
+        if (isRenderingCurrentCheckpoint) {
+          UI::PushStyleColor(UI::Col::Text, vec4(0.7, 0.7, 0.7, 1.0));
+        }
+
         // CP
         if (showCheckpoints) {
           UI::TableNextColumn();
@@ -1348,6 +1356,10 @@ void Render() {
           UI::TableNextColumn();
           UI::TableNextColumn();
         }
+
+        if (isRenderingCurrentCheckpoint) {
+          UI::PopStyleColor();
+        }
       }
 
       UI::EndTable();
@@ -1375,8 +1387,16 @@ void DrawDeltaText(int delta) {
   if (!shouldDeltaLerpColor) {
     scale *= 0;
   }
+  vec4 colorScale;
+  if (isRenderingCurrentCheckpoint) {
+    colorScale = vec4(0.8, 0.8, 0.8, 1.0);
+  } else {
+    colorScale = vec4(1.0, 1.0, 1.0, 1.0);
+  }
   vec4 negDelta;
   vec4 negDeltaLight;
+  vec4 posDelta = vec4(1.0, 0.0, 0.0, 1.0);
+  vec4 posDeltaLight = vec4(1.0, 0.4, 0.4, 1.0);
   if (shouldDeltaBeBlue) {  // why does blue look so shit?
     negDelta = vec4(0.4, 0.4, 1.0, 1.0);
     negDeltaLight = vec4(0.5, 0.5, 1.0, 1.0);
@@ -1387,18 +1407,26 @@ void DrawDeltaText(int delta) {
   }
   if (delta > 0) {
     UI::PushStyleColor(UI::Col::Text, lerpMap(delta, 0, 100 * scale + 1,
-                                              vec4(1.0, 0.4, 0.4, 1.0),
-                                              vec4(1.0, 0.0, 0.0, 1.0)));
+                                              posDeltaLight * colorScale,
+                                              posDelta * colorScale));
     UI::Text("+" + Time::Format(delta));
   } else if (delta == 0) {
-    UI::PushStyleColor(UI::Col::Text, negDelta);
+    UI::PushStyleColor(UI::Col::Text, negDelta * colorScale);
     UI::Text("-" + Time::Format(-delta));
   } else {
     UI::PushStyleColor(UI::Col::Text, lerpMap(delta, -100 * scale - 1, 0,
-                                              negDelta, negDeltaLight));
+                                              negDelta * colorScale,
+                                              negDeltaLight * colorScale));
     UI::Text("-" + Time::Format(-delta));
   }
   UI::PopStyleColor();
+}
+
+int boolToInt(bool value) {
+  if (value) {
+    return 1;
+  }
+  return 0;
 }
 
 bool isCurrentCPValid(uint index) {

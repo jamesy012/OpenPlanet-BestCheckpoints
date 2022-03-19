@@ -40,6 +40,9 @@ bool shouldDeltaLerpColor = true;
 [Setting category="Options" name="Should negatiive delta be blue" description="changes the negative delta from green to blue"]
 bool shouldDeltaBeBlue = false;
 
+[Setting category="Options" name="Darken current lap" description="slightly darkens the current lap"]
+bool darkenCurrentLap = true;
+
 [Setting category="Window Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
 bool showTheoreticalBest = true;
 
