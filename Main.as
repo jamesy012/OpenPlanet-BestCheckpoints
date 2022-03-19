@@ -100,6 +100,11 @@ void ResetCommon() {
   jsonData = Json::Object();
 
   hasFinishedMap = false;
+
+#if TURBO
+  // map load will set this or we count as we checkpoint
+  numCps = 0;
+#endif
 }
 
 void ResetRace() {
@@ -241,7 +246,7 @@ void Update(float dt) {
 #endif
 
     // update our best times, different logic for multilap
-    if (int(currLapTimesRec.Length) == numCps && currentLap != 0) {
+    if (int(currLapTimesRec.Length) == numCps && currentLap == 0) {
       CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time);
     } else {
       if (int(bestTimesRec.Length) != numCps) {
@@ -674,6 +679,9 @@ string GetMapName() {
   return playground.Map.MapName;
 #elif TURBO
   auto map = GetApp().Challenge;
+  if (map is null) {
+    return "";
+  }
   return map.MapInfo.NameForUi;
 #endif
 }
@@ -687,6 +695,9 @@ string GetMapId() {
   return playground.Map.IdName;
 #elif TURBO
   auto map = GetApp().Challenge;
+  if (map is null) {
+    return "";
+  }
   return map.MapInfo.MapUid;
 #endif
 }
@@ -762,6 +773,9 @@ void UpdateWaypoints() {
   auto map = playground.Map;
 #elif TURBO
   auto map = GetApp().Challenge;
+  if (map is null) {
+    return;
+  }
 #endif
   numLaps = map.TMObjective_NbLaps;
   isMultiLap = map.TMObjective_IsLapRace;
@@ -1095,7 +1109,8 @@ void Render() {
     //     UI::EndTable();
     // }
 
-    if (UI::BeginTable("info", 2, UI::TableFlags::SizingFixedFit)) {
+    if (hasFinishedMap &&
+        UI::BeginTable("info", 2, UI::TableFlags::SizingFixedFit)) {
       if (shouldShowTheoretical) {
         UI::TableNextColumn();
         string text = "Theoretical: ";
@@ -1338,8 +1353,8 @@ void DrawDeltaText(int delta) {
   }
   vec4 negDelta;
   vec4 negDeltaLight;
-  if (shouldDeltaBeBlue) {
-    negDelta = vec4(0.35, 0.35, 1.0, 1.0);
+  if (shouldDeltaBeBlue) {  // why does blue look so shit?
+    negDelta = vec4(0.4, 0.4, 1.0, 1.0);
     negDeltaLight = vec4(0.5, 0.5, 1.0, 1.0);
     // negDelta = negDeltaLight;
   } else {
