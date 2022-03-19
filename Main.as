@@ -219,8 +219,8 @@ void Update(float dt) {
 
     int deltaTime = raceTime - lastCpTime;
 
-    print("Delta time: " + deltaTime);
-    print("Race time: " + raceTime);
+    DebugText("Delta time: " + deltaTime);
+    DebugText("Race time: " + raceTime);
 
     lastCpTime = raceTime;
 
@@ -239,16 +239,17 @@ void Update(float dt) {
     CreateOrUpdateCurrentTime(cp, deltaTime);
 
 #if TURBO || MP4
-    print(cp + " > " + numCps);
+    DebugText(cp + " > " + numCps);
     if (hasFinishedMap == false && cp > numCps) {
       numCps++;  // turbo Temp
-      print("adding CP");
+      DebugText("adding CP");
     }
 #endif
 
+    DebugText("NumCps:" + numCps);
     // update our best times, different logic for multilap
     if (int(currLapTimesRec.Length) == numCps
-    //turbo/mp4 hack, needs this for multilap to function?
+    // turbo/mp4 hack, needs this for multilap to function?
 #if TURBO || MP4
         && currentLap == 0
 #endif
@@ -269,9 +270,9 @@ void Update(float dt) {
 #if TMNEXT
     if (IsWaypointFinish(cp)) {
 #elif TURBO || MP4
-    print("Laps: " + GetPlayerLap() + " - " + currentLap);
+    DebugText("Laps: " + GetPlayerLap() + " - " + currentLap);
     if (IsPlayerFinished() || GetPlayerLap() != currentLap) {
-      print("Finish lap");
+      DebugText("Finish lap");
       // turboCheckpointCounter = 0;
       lastCP = 0;
 #endif
@@ -776,6 +777,7 @@ void UpdateWaypoints() {
   auto playground = GetPlayground();
   if (playground is null || playground.Arena is null ||
       playground.Arena.Rules is null) {
+    DebugText("map not ready for waypoint read?");
     return;
   }
 
@@ -936,7 +938,7 @@ void LoadFile() {
       }
       if (versionFloat >= 1.3) {
         hasFinishedMap = jsonData["finished"];
-        print("loaded finished map " + hasFinishedMap);
+        DebugText("loaded finished map " + hasFinishedMap);
       } else {
         hasFinishedMap = pbTime > 1;
       }
