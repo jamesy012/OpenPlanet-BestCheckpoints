@@ -247,7 +247,12 @@ void Update(float dt) {
 #endif
 
     // update our best times, different logic for multilap
-    if (int(currLapTimesRec.Length) == numCps && currentLap == 0) {
+    if (int(currLapTimesRec.Length) == numCps
+    //turbo/mp4 hack, needs this for multilap to function?
+#if TURBO || MP4
+        && currentLap == 0
+#endif
+    ) {
       CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time);
     } else {
       if (int(bestTimesRec.Length) != numCps) {
@@ -822,6 +827,8 @@ void UpdateWaypoints() {
       strictMode = false;
     }
   }
+
+  hasFinishedMap = true;
 #endif
 }
 
@@ -930,6 +937,8 @@ void LoadFile() {
       if (versionFloat >= 1.3) {
         hasFinishedMap = jsonData["finished"];
         print("loaded finished map " + hasFinishedMap);
+      } else {
+        hasFinishedMap = pbTime > 1;
       }
       for (int i = 0; i < numCps; i++) {
         string key = "" + i;
