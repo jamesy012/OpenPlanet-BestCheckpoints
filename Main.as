@@ -179,7 +179,7 @@ void Update(float dt) {
 
       playerStartTime = GetActualPlayerStartTime();
 
-      if (numCps == 0) {
+      if (numCps <= 1) {
         UpdateWaypoints();
       }
 
