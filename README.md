@@ -18,6 +18,10 @@ Saves your best times to load whenever you come back to the map
 
 # Updates
 
+##### 1.4.1
+
+Fix for game api update which prevented the plugin from running
+
 ## 1.4
 
 Turbo and Maniaplanet support

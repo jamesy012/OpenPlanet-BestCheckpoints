@@ -506,7 +506,7 @@ CSmScriptPlayer @GetPlayerScript() {
   if (smPlayer is null) {
     return null;
   }
-  return smPlayer.ScriptAPI;
+  return cast<CSmScriptPlayer>(smPlayer.ScriptAPI);
 }
 
 bool IsPlayerReady() {
