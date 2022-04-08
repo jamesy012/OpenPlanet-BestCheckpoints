@@ -23,10 +23,12 @@ int numLaps = 0;
 class Record {
   int checkpointId = -1;
   int time;
+  int speed;
 
-  Record(int checkpointId, int time) {
+  Record(int checkpointId, int time, int speed) {
     this.checkpointId = checkpointId;
     this.time = time;
+    this.speed = speed;
   }
 
   Record @opAssign(const Record& in record) {
@@ -65,7 +67,7 @@ Resources::Font @font = null;
 // file io
 string jsonFile = '';
 Json::Value jsonData = Json::Object();
-string jsonVersion = "1.3";
+string jsonVersion = "1.4";
 
 // ui timing
 int lastEstimatedTime = 0;
@@ -236,7 +238,7 @@ void Update(float dt) {
     }
 
     // add our time (best current time for run)
-    CreateOrUpdateCurrentTime(cp, deltaTime);
+    CreateOrUpdateCurrentTime(cp, deltaTime, GetPlayerSpeed());
 
 #if TURBO || MP4
     DebugText(cp + " > " + numCps);
@@ -254,15 +256,16 @@ void Update(float dt) {
         && currentLap == 0
 #endif
     ) {
-      CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time);
+      CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time,
+                             GetPlayerSpeed());
     } else {
       if (int(bestTimesRec.Length) != numCps) {
-        CreateOrUpdateBestTime(cp, deltaTime);
+        CreateOrUpdateBestTime(cp, deltaTime, GetPlayerSpeed());
       }
     }
 
     // update time for laps
-    CreateOrUpdateCurrentLapTime(cp, deltaTime);
+    CreateOrUpdateCurrentLapTime(cp, deltaTime, GetPlayerSpeed());
 
     currCP++;
 
@@ -304,7 +307,7 @@ void Update(float dt) {
   }
 }
 
-void CreateOrUpdateCurrentTime(int checkpoint, int time) {
+void CreateOrUpdateCurrentTime(int checkpoint, int time, int speed) {
   int recIndex = -1;
   for (uint i = 0; i < currTimesRec.Length; i++) {
     if (currTimesRec[i].checkpointId == checkpoint) {
@@ -314,16 +317,17 @@ void CreateOrUpdateCurrentTime(int checkpoint, int time) {
   }
 
   if (recIndex == -1) {
-    Record rec(checkpoint, time);
+    Record rec(checkpoint, time, speed);
     currTimesRec.InsertLast(rec);
   } else {
     if (currTimesRec[recIndex].time > time) {
       currTimesRec[recIndex].time = time;
+      currTimesRec[recIndex].speed = speed;
     }
   }
 }
 
-void CreateOrUpdateBestTime(int checkpoint, int time) {
+void CreateOrUpdateBestTime(int checkpoint, int time, int speed) {
   int recIndex = -1;
   for (uint i = 0; i < bestTimesRec.Length; i++) {
     if (bestTimesRec[i].checkpointId == checkpoint) {
@@ -333,16 +337,18 @@ void CreateOrUpdateBestTime(int checkpoint, int time) {
   }
 
   if (recIndex == -1) {
-    Record rec(checkpoint, time);
+    Record rec(checkpoint, time, speed);
     bestTimesRec.InsertLast(rec);
   } else {
     if (bestTimesRec[recIndex].time > time) {
       bestTimesRec[recIndex].time = time;
+      bestTimesRec[recIndex].speed = speed;
     }
   }
 }
 
-void CreateOrUpdatePBTime(int checkpoint, int time) {
+// todo replace paramaters with Record reference
+void CreateOrUpdatePBTime(int checkpoint, int time, int speed) {
   int recIndex = -1;
   for (uint i = 0; i < pbTimesRec.Length; i++) {
     if (pbTimesRec[i].checkpointId == checkpoint) {
@@ -352,16 +358,17 @@ void CreateOrUpdatePBTime(int checkpoint, int time) {
   }
 
   if (recIndex == -1) {
-    Record rec(checkpoint, time);
+    Record rec(checkpoint, time, speed);
     pbTimesRec.InsertLast(rec);
   } else {
     // if (pbTimesRec[recIndex].time > time) {
     pbTimesRec[recIndex].time = time;
+    pbTimesRec[recIndex].speed = speed;
     //}
   }
 }
 
-void CreateOrUpdateCurrentLapTime(int checkpoint, int time) {
+void CreateOrUpdateCurrentLapTime(int checkpoint, int time, int speed) {
   int recIndex = -1;
   for (uint i = 0; i < currLapTimesRec.Length; i++) {
     if (currLapTimesRec[i].checkpointId == checkpoint) {
@@ -371,12 +378,14 @@ void CreateOrUpdateCurrentLapTime(int checkpoint, int time) {
   }
 
   if (recIndex == -1) {
-    Record rec(checkpoint, time);
+    Record rec(checkpoint, time, speed);
     currLapTimesRec.InsertLast(rec);
-    lastLapTimesRec.InsertLast(Record(checkpoint, -1));
+    lastLapTimesRec.InsertLast(Record(checkpoint, -1, -1));
   } else {
     lastLapTimesRec[recIndex].time = currLapTimesRec[recIndex].time;
+    lastLapTimesRec[recIndex].speed = currLapTimesRec[recIndex].speed;
     currLapTimesRec[recIndex].time = time;
+    currLapTimesRec[recIndex].speed = speed;
   }
 }
 
@@ -385,7 +394,8 @@ void UpdatePersonalBestTimes() {
       (finishRaceTime < pbTime || pbTime == 0)) {
     pbTime = finishRaceTime;
     for (uint i = 0; i < currTimesRec.Length; i++) {
-      CreateOrUpdatePBTime(currTimesRec[i].checkpointId, currTimesRec[i].time);
+      CreateOrUpdatePBTime(currTimesRec[i].checkpointId, currTimesRec[i].time,
+                           currTimesRec[i].speed);
     }
     // Final checkpoint is finish, can have multiple finish checkpoints, so this
     // overides that
@@ -545,6 +555,11 @@ int GetPlayerCheckpointTime() {
   CTrackManiaPlayer @smPlayer = GetPlayer();
   return smPlayer.CurCheckpointRaceTime;
 #endif
+}
+
+int GetPlayerSpeed() {
+  CSmScriptPlayer @smPlayerScript = GetPlayerScript();
+  return smPlayerScript.DisplaySpeed;
 }
 
 #if TMNEXT
@@ -931,7 +946,7 @@ void LoadFile() {
   if (jsonData.HasKey("version") && jsonData.HasKey("size")) {
     string version = jsonData["version"];
     float versionFloat = Text::ParseFloat(version);
-    if (version == jsonVersion || version == "1.2" || version == "1.1") {
+    if (version >= "1.1") {
       numCps = jsonData["size"];
       if (versionFloat >= 1.2) {
         pbTime = jsonData["pb"];
@@ -947,12 +962,19 @@ void LoadFile() {
         if (jsonData.HasKey(key)) {
           if (version == "1.0") {
             // 1.0 stored in seperate data, with no checkpoint index
-            CreateOrUpdateBestTime(-1, jsonData[key]);
+            CreateOrUpdateBestTime(-1, jsonData[key], -1);
           } else {  // current
-            CreateOrUpdateBestTime(jsonData[key]["cp"], jsonData[key]["time"]);
+            int speed = -1;
+            int pbSpeed = -1;
+            if (versionFloat >= 1.4) {
+              speed = jsonData[key]["speed"];
+              pbSpeed = jsonData[key]["pbSpeed"];
+            }
+            CreateOrUpdateBestTime(jsonData[key]["cp"], jsonData[key]["time"],
+                                   speed);
             if (versionFloat >= 1.2) {
-              CreateOrUpdatePBTime(jsonData[key]["cp"],
-                                   jsonData[key]["pbTime"]);
+              CreateOrUpdatePBTime(jsonData[key]["cp"], jsonData[key]["pbTime"],
+                                   pbSpeed);
             }
           }
         } else {
@@ -1002,7 +1024,9 @@ void SaveFile() {
   for (uint i = 0; i < bestTimesRec.Length; i++) {
     Json::Value arrayData = Json::Object();
     arrayData["time"] = bestTimesRec[i].time;
+    arrayData["speed"] = bestTimesRec[i].speed;
     arrayData["pbTime"] = pbTimesRec[i].time;
+    arrayData["pbSpeed"] = pbTimesRec[i].speed;
     arrayData["cp"] = bestTimesRec[i].checkpointId;
     jsonData["" + i] = arrayData;
   }
@@ -1062,7 +1086,7 @@ void Render() {
   bool shouldShowPersonalBest = showPersonalBest && pbTime != 0;
   bool shouldShowLastLapDelta = isMultiLap && numLaps != 1;
   // number of cols we show checkpoint data for
-  int dataCols = 0;
+  int dataCols = 5;
   if (showCheckpoints) {
     dataCols++;
   }
@@ -1260,6 +1284,31 @@ void Render() {
           SetMinWidth(deltaWidth);
           UI::Text("B-PB. Delta");
         }
+        if (true) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("speed");
+        }
+        if (true) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("B speed");
+        }
+        if (true) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("B S Delta");
+        }
+        if (true) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("PB speed");
+        }
+        if (true) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("PB S Delta");
+        }
       }
 
       bool isPBFaster = pbTime >= finishRaceTime;
@@ -1368,6 +1417,37 @@ void Render() {
           UI::TableNextColumn();
         }
 
+        if (true) {
+          UI::TableNextColumn();
+          if (currTimesRec.Length > i) {
+            UI::Text("" + currTimesRec[i].speed);
+          }
+        }
+        if (true) {
+          UI::TableNextColumn();
+          if (bestTimesRec.Length > i) {
+            UI::Text("" + bestTimesRec[i].speed);
+          }
+        }
+        if (true) {
+          UI::TableNextColumn();
+          if (bestTimesRec.Length > i && currTimesRec.Length > i) {
+            DrawSpeedDeltaText(bestTimesRec[i].speed - currTimesRec[i].speed);
+          }
+        }
+        if (true) {
+          UI::TableNextColumn();
+          if (pbTimesRec.Length > i) {
+            UI::Text("" + pbTimesRec[i].speed);
+          }
+        }
+        if (true) {
+          UI::TableNextColumn();
+          if (pbTimesRec.Length > i && currTimesRec.Length > i) {
+            DrawSpeedDeltaText(pbTimesRec[i].speed - currTimesRec[i].speed);
+          }
+        }
+
         if (isRenderingCurrentCheckpoint) {
           UI::PopStyleColor();
         }
@@ -1429,6 +1509,46 @@ void DrawDeltaText(int delta) {
                                               negDelta * colorScale,
                                               negDeltaLight * colorScale));
     UI::Text("-" + Time::Format(-delta));
+  }
+  UI::PopStyleColor();
+}
+
+void DrawSpeedDeltaText(int delta) {
+  int scale = 1;
+  if (!shouldDeltaLerpColor) {
+    scale *= 0;
+  }
+  vec4 colorScale;
+  if (isRenderingCurrentCheckpoint) {
+    colorScale = vec4(0.8, 0.8, 0.8, 1.0);
+  } else {
+    colorScale = vec4(1.0, 1.0, 1.0, 1.0);
+  }
+  vec4 negDelta;
+  vec4 negDeltaLight;
+  vec4 posDelta = vec4(1.0, 0.0, 0.0, 1.0);
+  vec4 posDeltaLight = vec4(1.0, 0.4, 0.4, 1.0);
+  if (shouldDeltaBeBlue) {  // why does blue look so shit?
+    negDelta = vec4(0.4, 0.4, 1.0, 1.0);
+    negDeltaLight = vec4(0.5, 0.5, 1.0, 1.0);
+    // negDelta = negDeltaLight;
+  } else {
+    negDelta = vec4(0.0, 1.0, 0.0, 1.0);
+    negDeltaLight = vec4(0.5, 1.0, 0.5, 1.0);
+  }
+  if (delta > 0) {
+    UI::PushStyleColor(UI::Col::Text, lerpMap(delta, 0, 50 * scale + 1,
+                                              posDeltaLight * colorScale,
+                                              posDelta * colorScale));
+    UI::Text("-" + delta);
+  } else if (delta == 0) {
+    UI::PushStyleColor(UI::Col::Text, negDelta * colorScale);
+    UI::Text("+" + -delta);
+  } else {
+    UI::PushStyleColor(UI::Col::Text,
+                       lerpMap(delta, -50 * scale - 1, 0, negDelta * colorScale,
+                               negDeltaLight * colorScale));
+    UI::Text("+" + -delta);
   }
   UI::PopStyleColor();
 }
