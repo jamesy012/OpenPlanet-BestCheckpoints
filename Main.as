@@ -32,8 +32,10 @@ class Record {
   }
 
   Record @opAssign(const Record& in record) {
+    print("Assign");
     checkpointId = record.checkpointId;
     time = record.time;
+    speed = record.speed;
     return this;
   }
 }
@@ -248,21 +250,25 @@ void Update(float dt) {
     }
 #endif
 
-    DebugText("NumCps:" + numCps);
+    DebugText("NumCps:" +  int(currLapTimesRec.Length) + "/" + numCps);
     // update our best times, different logic for multilap
-    if (int(currLapTimesRec.Length) == numCps
-    // turbo/mp4 hack, needs this for multilap to function?
-#if TURBO || MP4
-        && currentLap == 0
-#endif
-    ) {
-      CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time,
-                             GetPlayerSpeed());
-    } else {
-      if (int(bestTimesRec.Length) != numCps) {
+//   if (int(currLapTimesRec.Length) == numCps)
+//   // turbo/mp4 hack, needs this for multilap to function?
+//if TURBO || MP4
+//       && currentLap == 0)
+//endif
+//   {
+//     print("normal update");
+//         CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time,
+//                                currLapTimesRec[currCP].speed);
+//       }
+//   else {
+//     print("other update");
+//     print(int(bestTimesRec.Length) +"/"+ numCps);
+     if (int(bestTimesRec.Length) < numCps || isMultiLap) {
         CreateOrUpdateBestTime(cp, deltaTime, GetPlayerSpeed());
       }
-    }
+ //   }
 
     // update time for laps
     CreateOrUpdateCurrentLapTime(cp, deltaTime, GetPlayerSpeed());
@@ -322,12 +328,15 @@ void CreateOrUpdateCurrentTime(int checkpoint, int time, int speed) {
   } else {
     if (currTimesRec[recIndex].time > time) {
       currTimesRec[recIndex].time = time;
+    }
+    if (currTimesRec[recIndex].speed < speed) {
       currTimesRec[recIndex].speed = speed;
     }
   }
 }
 
 void CreateOrUpdateBestTime(int checkpoint, int time, int speed) {
+    print("CreateOrUpdateBestTime");
   int recIndex = -1;
   for (uint i = 0; i < bestTimesRec.Length; i++) {
     if (bestTimesRec[i].checkpointId == checkpoint) {
@@ -342,6 +351,10 @@ void CreateOrUpdateBestTime(int checkpoint, int time, int speed) {
   } else {
     if (bestTimesRec[recIndex].time > time) {
       bestTimesRec[recIndex].time = time;
+    }
+    print(bestTimesRec[recIndex].speed);
+    print(speed);
+    if (bestTimesRec[recIndex].speed < speed) {
       bestTimesRec[recIndex].speed = speed;
     }
   }
@@ -424,7 +437,10 @@ void UpdateSaveBestData() {
     // update our best times
     for (uint i = 0; i < currTimesRec.Length; i++) {
       if (currTimesRec[i].time < bestTimesRec[i].time) {
-        bestTimesRec[i] = currTimesRec[i];
+        bestTimesRec[i].time = currTimesRec[i].time;
+      }
+      if (currTimesRec[i].speed > bestTimesRec[i].speed) {
+        bestTimesRec[i].speed = currTimesRec[i].speed;
       }
     }
 
@@ -843,6 +859,11 @@ void UpdateWaypoints() {
       numCps++;
       strictMode = false;
     }
+  }
+
+  if(isMultiLap && numLaps == 1){
+    numCps -= 1;
+    isMultiLap = false;
   }
 
   hasFinishedMap = true;
