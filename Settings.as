@@ -19,6 +19,8 @@ string fontFace = "";
 [Setting category="Display Settings" name="Font size" min=8 max=48 description="To avoid a memory issue with loading a large number of fonts, you must reload the plugin for font changes to be applied."]
 int fontSize = 16;
 
+// ---------------- GENERAL SETTINGS ------------
+
 [Setting category="Options" name="Enable Logging" description="will start logging text to get an idea about what the programs doing"]
 bool enableLogging = false;
 
@@ -37,20 +39,30 @@ bool shouldCompareToCurrentLap = false;
 [Setting category="Options" name="Should Delta have a color lerp" description="makes delta values closer to 0 be slightly lighter"]
 bool shouldDeltaLerpColor = true;
 
-[Setting category="Options" name="Should negatiive delta be blue" description="changes the negative delta from green to blue"]
+[Setting category="Options" name="Should negatiive delta be blue?" description="changes the negative delta from green to blue"]
 bool shouldDeltaBeBlue = false;
 
 [Setting category="Options" name="Darken current lap" description="slightly darkens the current lap"]
 bool darkenCurrentLap = true;
 
-[Setting category="Window Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
+// ---------------- TOP BAR ------------
+
+[Setting category="Window Bar Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
 bool showTheoreticalBest = true;
 
-[Setting category="Window Options" name="Show estimated time" description="Adds estimated finish time to the window header"]
+[Setting category="Window Bar Options" name="Show estimated time" description="Adds estimated finish time to the window header"]
 bool showEstimated = true;
 
-[Setting category="Window Options" name="Show map personal best time" description="Show the personal best time the plugin has stored (if using the plugin after already playing a map these values wont match up)"]
+[Setting category="Window Bar Options" name="Show map personal best time" description="Show the personal best time the plugin has stored (if using the plugin after already playing a map these values wont match up)"]
 bool showPersonalBest = false;
+
+[Setting category="Window Bar Options" name="Show Delta against PB" description="will match the value the game displays on the screen"]
+bool showTopPBDelta = false;
+
+[Setting category="Window Bar Options" name="Show delta againt Best" description="will display the current delta against Best times"]
+bool showTopBestDelta = false;
+
+// ---------------- Main Display Settings ------------
 
 [Setting category="Window Options" name="Show checkpoints" description="Adds a number to the left for each checkpoint in the map"]
 bool showCheckpoints = true;
@@ -87,6 +99,26 @@ bool showBestPBDelta = false;
 
 [Setting category="Window Options" name="Quick MultiLap Enable" description="turns on a few windows that are useful for multilap"]
 bool quickMultiLapEnable = false;
+
+// ---------------- Speed Display Settings ------------
+
+[Setting category="Window Options speed" name="Show checkpoint speed" description="shows the speed the car hit the checkpoint at"]
+bool showCurrentSpeed = false;
+
+[Setting category="Window Options speed" name="Show best speed" description="Shows the highest speed you have gone through this checkpoint at"]
+bool showBestSpeed = false;
+
+[Setting category="Window Options speed" name="Show best to current speed Delta" description="shows Delta between best and current speed"]
+bool showBestSpeedDelta = false;
+
+[Setting category="Window Options speed" name="Show PB speed" description="Shows the speed you have gone through this checkpoint for the last stored PB"]
+bool showPBSpeed = false;
+
+[Setting category="Window Options speed" name="Show PB to current speed Delta" description="shows Delta between last PB speed and current speed"]
+bool showPBSpeedDelta = false;
+
+
+// ---------------- JSON Data settings ------------
 
 [Setting category="Data" name="Save on disk" description="Stops saving data to disk - When this is disabled you will be able to load old data"]
 bool saveData = true;

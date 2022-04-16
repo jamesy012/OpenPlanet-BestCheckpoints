@@ -32,7 +32,6 @@ class Record {
   }
 
   Record @opAssign(const Record& in record) {
-    print("Assign");
     checkpointId = record.checkpointId;
     time = record.time;
     speed = record.speed;
@@ -250,25 +249,25 @@ void Update(float dt) {
     }
 #endif
 
-    DebugText("NumCps:" +  int(currLapTimesRec.Length) + "/" + numCps);
+    DebugText("NumCps:" + int(currLapTimesRec.Length) + "/" + numCps);
     // update our best times, different logic for multilap
-//   if (int(currLapTimesRec.Length) == numCps)
-//   // turbo/mp4 hack, needs this for multilap to function?
-//if TURBO || MP4
-//       && currentLap == 0)
-//endif
-//   {
-//     print("normal update");
-//         CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time,
-//                                currLapTimesRec[currCP].speed);
-//       }
-//   else {
-//     print("other update");
-//     print(int(bestTimesRec.Length) +"/"+ numCps);
-     if (int(bestTimesRec.Length) < numCps || isMultiLap) {
-        CreateOrUpdateBestTime(cp, deltaTime, GetPlayerSpeed());
-      }
- //   }
+    //   if (int(currLapTimesRec.Length) == numCps)
+    //   // turbo/mp4 hack, needs this for multilap to function?
+    // if TURBO || MP4
+    //       && currentLap == 0)
+    // endif
+    //   {
+    //     print("normal update");
+    //         CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time,
+    //                                currLapTimesRec[currCP].speed);
+    //       }
+    //   else {
+    //     print("other update");
+    //     print(int(bestTimesRec.Length) +"/"+ numCps);
+    if (int(bestTimesRec.Length) < numCps || isMultiLap) {
+      CreateOrUpdateBestTime(cp, deltaTime, GetPlayerSpeed());
+    }
+    //   }
 
     // update time for laps
     CreateOrUpdateCurrentLapTime(cp, deltaTime, GetPlayerSpeed());
@@ -336,7 +335,6 @@ void CreateOrUpdateCurrentTime(int checkpoint, int time, int speed) {
 }
 
 void CreateOrUpdateBestTime(int checkpoint, int time, int speed) {
-    print("CreateOrUpdateBestTime");
   int recIndex = -1;
   for (uint i = 0; i < bestTimesRec.Length; i++) {
     if (bestTimesRec[i].checkpointId == checkpoint) {
@@ -352,8 +350,6 @@ void CreateOrUpdateBestTime(int checkpoint, int time, int speed) {
     if (bestTimesRec[recIndex].time > time) {
       bestTimesRec[recIndex].time = time;
     }
-    print(bestTimesRec[recIndex].speed);
-    print(speed);
     if (bestTimesRec[recIndex].speed < speed) {
       bestTimesRec[recIndex].speed = speed;
     }
@@ -861,7 +857,7 @@ void UpdateWaypoints() {
     }
   }
 
-  if(isMultiLap && numLaps == 1){
+  if (isMultiLap && numLaps == 1) {
     numCps -= 1;
     isMultiLap = false;
   }
@@ -1107,40 +1103,27 @@ void Render() {
   bool shouldShowPersonalBest = showPersonalBest && pbTime != 0;
   bool shouldShowLastLapDelta = isMultiLap && numLaps != 1;
   // number of cols we show checkpoint data for
-  int dataCols = 5;
-  if (showCheckpoints) {
-    dataCols++;
-  }
-  if (showCurrentBest) {
-    dataCols++;
-  }
-  if (showCurrent) {
-    dataCols++;
-  }
-  if (shouldShowLastLapDelta && showLastLap) {
-    dataCols++;
-  }
-  if (shouldShowLastLapDelta && showLastLapDelta) {
-    dataCols++;
-  }
-  if (showBest) {
-    dataCols++;
-  }
-  if (showBestDelta) {
-    dataCols++;
-  }
-  if (showPB) {
-    dataCols++;
-  }
-  if (showPBDelta) {
-    dataCols++;
-  }
-  if (showBestPBDelta) {
-    dataCols++;
-  }
+  int dataCols = 0;
+  dataCols += BoolToInt(showCheckpoints);
+  dataCols += BoolToInt(showCurrentBest);
+  dataCols += BoolToInt(showCurrent);
+  dataCols += BoolToInt(shouldShowLastLapDelta && showLastLap);
+  dataCols += BoolToInt(shouldShowLastLapDelta && showLastLapDelta);
+  dataCols += BoolToInt(showBest);
+  dataCols += BoolToInt(showBestDelta);
+  dataCols += BoolToInt(showPB);
+  dataCols += BoolToInt(showPBDelta);
+  dataCols += BoolToInt(showBestPBDelta);
+  // speed
+  dataCols += BoolToInt(showCurrentSpeed);
+  dataCols += BoolToInt(showBestSpeed);
+  dataCols += BoolToInt(showBestSpeedDelta);
+  dataCols += BoolToInt(showPBSpeed);
+  dataCols += BoolToInt(showPBSpeedDelta);
 
   bool isDisplayingSomething = shouldShowEstimated || shouldShowTheoretical ||
-                               shouldShowPersonalBest || dataCols != 0;
+                               shouldShowPersonalBest || showTopBestDelta ||
+                               showTopPBDelta || dataCols != 0;
 
   if (hideWithIFace) {
     auto playground = app.CurrentPlayground;
@@ -1184,14 +1167,31 @@ void Render() {
 
     UI::BeginGroup();
 
-    // if (UI::BeginTable("Header", 2, UI::TableFlags::SizingFixedFit)) {
-    //         UI::TableNextColumn();
-    //     UI::Text("Sector Times");
-    //     UI::EndTable();
+    // int wantedTopBar = 0;
+    // wantedTopBar += BoolToInt(shouldShowTheoretical);
+    // wantedTopBar += BoolToInt(shouldShowEstimated);
+    // wantedTopBar += BoolToInt(shouldShowPersonalBest);
+    // wantedTopBar += BoolToInt(true);  // PB Delta
+    // wantedTopBar += BoolToInt(true);  // Best Delta
+    // wantedTopBar*=2;
+    int avaliableTopBar = dataCols;
+    if (avaliableTopBar % 2 == 1) {
+      avaliableTopBar--;
+    }
+    if (avaliableTopBar < 2) {
+      avaliableTopBar = 2;
+    }
+
+    // if (UI::BeginTable("as", 6, UI::TableFlags::SizingFixedFit)) {
+    //   UI::TableNextColumn();
+    //   UI::Text("wanted " + wantedTopBar);
+    //   UI::TableNextColumn();
+    //   UI::Text("Avaliable " + avaliableTopBar);
+    //   UI::EndTable();
     // }
 
-    if (hasFinishedMap &&
-        UI::BeginTable("info", 2, UI::TableFlags::SizingFixedFit)) {
+    if (hasFinishedMap && UI::BeginTable("info", avaliableTopBar / 2,
+                                         UI::TableFlags::SizingFixedFit)) {
       if (shouldShowTheoretical) {
         UI::TableNextColumn();
         string text = "Theoretical: ";
@@ -1233,7 +1233,6 @@ void Render() {
           text += "~" + Time::Format(time);
           UI::Text(text);
         }
-        // UI::PopStyleColor();
       }
 
       if (shouldShowPersonalBest) {
@@ -1241,6 +1240,34 @@ void Render() {
         string text = "PB: ";
         text += Time::Format(pbTime);
         UI::Text(text);
+      }
+
+      if (showTopPBDelta) {
+        UI::TableNextColumn();
+        string text = "PB Delta:";
+        int delta = 0;
+        for (uint i = 0; i < currTimesRec.Length; i++) {
+          if (pbTimesRec.Length > i) {
+            delta += getCurrentCPTime(i) - pbTimesRec[i].time;
+          }
+        }
+        UI::Text(text);
+        UI::SameLine();
+        DrawDeltaText(delta);
+      }
+
+      if (showTopBestDelta) {
+        UI::TableNextColumn();
+        string text = "Best Delta:";
+        int delta = 0;
+        for (uint i = 0; i < currTimesRec.Length; i++) {
+          if (bestTimesRec.Length > i) {
+            delta += getCurrentCPTime(i) - bestTimesRec[i].time;
+          }
+        }
+        UI::Text(text);
+        UI::SameLine();
+        DrawDeltaText(delta);
       }
 
       UI::EndTable();
@@ -1305,30 +1332,30 @@ void Render() {
           SetMinWidth(deltaWidth);
           UI::Text("B-PB. Delta");
         }
-        if (true) {
+        if (showCurrentSpeed) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
-          UI::Text("speed");
+          UI::Text("Speed");
         }
-        if (true) {
+        if (showBestSpeed) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
-          UI::Text("B speed");
+          UI::Text("B. speed");
         }
-        if (true) {
+        if (showBestSpeedDelta) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
-          UI::Text("B S Delta");
+          UI::Text("B. S. Delta");
         }
-        if (true) {
+        if (showPBSpeed) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
-          UI::Text("PB speed");
+          UI::Text("PB. speed");
         }
-        if (true) {
+        if (showPBSpeedDelta) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
-          UI::Text("PB S Delta");
+          UI::Text("PB. S. Delta");
         }
       }
 
@@ -1438,31 +1465,32 @@ void Render() {
           UI::TableNextColumn();
         }
 
-        if (true) {
+        // speed
+        if (showCurrentSpeed) {
           UI::TableNextColumn();
           if (currTimesRec.Length > i) {
             UI::Text("" + currTimesRec[i].speed);
           }
         }
-        if (true) {
+        if (showBestSpeed) {
           UI::TableNextColumn();
           if (bestTimesRec.Length > i) {
             UI::Text("" + bestTimesRec[i].speed);
           }
         }
-        if (true) {
+        if (showBestSpeedDelta) {
           UI::TableNextColumn();
           if (bestTimesRec.Length > i && currTimesRec.Length > i) {
             DrawSpeedDeltaText(bestTimesRec[i].speed - currTimesRec[i].speed);
           }
         }
-        if (true) {
+        if (showPBSpeed) {
           UI::TableNextColumn();
           if (pbTimesRec.Length > i) {
             UI::Text("" + pbTimesRec[i].speed);
           }
         }
-        if (true) {
+        if (showPBSpeedDelta) {
           UI::TableNextColumn();
           if (pbTimesRec.Length > i && currTimesRec.Length > i) {
             DrawSpeedDeltaText(pbTimesRec[i].speed - currTimesRec[i].speed);
@@ -1574,13 +1602,6 @@ void DrawSpeedDeltaText(int delta) {
   UI::PopStyleColor();
 }
 
-int boolToInt(bool value) {
-  if (value) {
-    return 1;
-  }
-  return 0;
-}
-
 bool isCurrentCPValid(uint index) {
   if (shouldCompareToCurrentLap) {
     return currLapTimesRec.Length > index;
@@ -1615,6 +1636,15 @@ void LoadFont() {
       loadedFontSize = fontSize;
     }
   }
+}
+
+// HELPERS
+
+int BoolToInt(bool value) {
+  if (value) {
+    return 1;
+  }
+  return 0;
 }
 
 // UIModule_Race_TimeGap
