@@ -45,6 +45,9 @@ bool shouldDeltaBeBlue = false;
 [Setting category="Options" name="Darken current lap" description="slightly darkens the current lap"]
 bool darkenCurrentLap = true;
 
+[Setting category="Options" name="Estimated Time Use optimal Time" description="when off it uses the PB time as a base for estimated time, otherwise it'll use the optimal time"]
+bool estimatedTimeUseOptimal = true;
+
 // ---------------- TOP BAR ------------
 
 [Setting category="Window Bar Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]

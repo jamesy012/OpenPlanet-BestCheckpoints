@@ -897,25 +897,33 @@ int GetPlayerLap() {
 #endif
 
 int CalulateEstimatedTime() {
-  if (int(bestTimesRec.Length) != numCps) {
+  Record @[] estCompTimes;
+
+  if (estimatedTimeUseOptimal) {
+    estCompTimes = bestTimesRec;
+  } else {
+    estCompTimes = pbTimesRec;
+  }
+
+  if (int(estCompTimes.Length) != numCps) {
     return 0;
   }
   int currentFinishTime = 0;
   int currentLapTime = 0;
-  for (int i = 0; i < int(bestTimesRec.Length); i++) {
+  for (int i = 0; i < int(estCompTimes.Length); i++) {
     if (currCP > i) {
       currentFinishTime += currLapTimesRec[i].time;
       currentLapTime += currLapTimesRec[i].time;
     } else {
-      currentFinishTime += bestTimesRec[i].time;
+      currentFinishTime += estCompTimes[i].time;
     }
   }
 
   // problem here in multiplayer matched when they end the cars timer keeps
   // going up
-  if (updatingEstimatedTime && int(bestTimesRec.Length) > currCP &&
+  if (updatingEstimatedTime && int(estCompTimes.Length) > currCP &&
       !isFinished && !waitForCarReset && GetCurrentPlayerRaceTime() > 0) {
-    currentLapTime += bestTimesRec[currCP].time;
+    currentLapTime += estCompTimes[currCP].time;
     if (currentLapTime < GetCurrentPlayerRaceTime()) {
       int different = GetCurrentPlayerRaceTime() - currentLapTime;
       currentFinishTime += different;
@@ -1182,19 +1190,11 @@ void Render() {
       avaliableTopBar = 2;
     }
 
-    // if (UI::BeginTable("as", 6, UI::TableFlags::SizingFixedFit)) {
-    //   UI::TableNextColumn();
-    //   UI::Text("wanted " + wantedTopBar);
-    //   UI::TableNextColumn();
-    //   UI::Text("Avaliable " + avaliableTopBar);
-    //   UI::EndTable();
-    // }
-
     if (hasFinishedMap && UI::BeginTable("info", avaliableTopBar / 2,
                                          UI::TableFlags::SizingFixedFit)) {
       if (shouldShowTheoretical) {
         UI::TableNextColumn();
-        string text = "Theoretical: ";
+        string text = "Optimal: ";
         // show lowest if we have finished or on a seperate lap
         bool shouldShowLowest = isFinished || (currentLap != 0);
 
@@ -1217,13 +1217,16 @@ void Render() {
         int time = 0;
         if (currCP != 0 || !isMultiLap ||
             int(currLapTimesRec.Length) != numCps) {
-          // UI::PushStyleColor(UI::Col::Text, vec4(1.0, 1.0, 1.0, 1.0));
           lastEstimatedTime = CalulateEstimatedTime();
         } else {
-          // UI::PushStyleColor(UI::Col::Text, vec4(0.5, 0.5, 1.0, 1.0));
           // last checkpoint delta off
-          time =
-              currLapTimesRec[numCps - 1].time - bestTimesRec[numCps - 1].time;
+          if (estimatedTimeUseOptimal) {
+            time = currLapTimesRec[numCps - 1].time -
+                   bestTimesRec[numCps - 1].time;
+          } else {
+            time =
+                currLapTimesRec[numCps - 1].time - pbTimesRec[numCps - 1].time;
+          }
         }
         time += lastEstimatedTime;
 
