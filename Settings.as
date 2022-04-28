@@ -50,7 +50,7 @@ bool estimatedTimeUseOptimal = true;
 
 // ---------------- TOP BAR ------------
 
-[Setting category="Window Bar Options" name="Show theoretical best" description="Adds theoretical best time to the window header"]
+[Setting category="Window Bar Options" name="Show Optimal best" description="Adds theoretical/Optimal best time to the window header"]
 bool showTheoreticalBest = true;
 
 [Setting category="Window Bar Options" name="Show estimated time" description="Adds estimated finish time to the window header"]
@@ -100,8 +100,14 @@ bool showPBColor = true;
 [Setting category="Window Options" name="Show best to personal best Delta" description="Adds best to personal best delta to the window"]
 bool showBestPBDelta = false;
 
-[Setting category="Window Options" name="Quick MultiLap Enable" description="turns on a few windows that are useful for multilap"]
+[Setting category="Window Options" name="Quick MultiLap Enable" description="turns on a few options that are useful for multilap"]
 bool quickMultiLapEnable = false;
+
+[Setting category="Window Options" name="Num Checkpoints on screen" description="max numnber of checkpoints allowed to be on screen"]//, min="3"]
+int numCheckpointsOnScreen = 15;
+
+[Setting category="Window Options" name="Checkpoint Cycle Speed (Seconds)" description="how quick the checkpoints will cycle after a map is finished"]//, min=0]
+float finishedCheckpointCycleSpeed = 3.0f;
 
 // ---------------- Speed Display Settings ------------
 

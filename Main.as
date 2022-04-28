@@ -1364,11 +1364,38 @@ void Render() {
 
       bool isPBFaster = pbTime >= finishRaceTime;
 
-      for (uint i = 0; i < bestTimesRec.Length; i++) {
+      uint minNum = Math::Min(bestTimesRec.Length, Math::Abs(numCheckpointsOnScreen));
+      uint offset = 0;
+
+      if (minNum < bestTimesRec.Length) {
+        if (currCP > int(minNum) / 2) {
+          offset = currCP - minNum / 2;
+        }
+
+        if (currCP + minNum > int(bestTimesRec.Length) + 1 &&
+            (!isMultiLap || isFinished)) {
+          offset = int(bestTimesRec.Length) - minNum;
+        }
+
+        if (isFinished) {
+          int postOffset =
+              int((GetCurrentPlayerRaceTime() - finishRaceTime) /
+                  (Math::Max(0.001f, finishedCheckpointCycleSpeed) * 1000.0f));
+          offset += Math::Max(0, postOffset);
+        }
+      }
+
+      for (uint q = 0; q < minNum; q++) {
+        uint i = offset + q;
+
+        if (isMultiLap || isFinished) {
+          i = i % bestTimesRec.Length;
+        }
         UI::TableNextRow();
 
         isRenderingCurrentCheckpoint =
             (int(i) == currCP && !invalidRun && darkenCurrentLap);
+        isRenderingCurrentCheckpoint = isRenderingCurrentCheckpoint || (i == 0 && minNum < bestTimesRec.Length && isFinished);
 
         if (isRenderingCurrentCheckpoint) {
           UI::PushStyleColor(UI::Col::Text, vec4(0.7, 0.7, 0.7, 1.0));
