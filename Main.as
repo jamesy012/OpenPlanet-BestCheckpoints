@@ -4,6 +4,7 @@
 #include "Settings.as"
 #include "cppIntellisense.h"
 #endif
+//#define SAVE_TEST
 
 // timing
 int lastCpTime = 0;
@@ -69,6 +70,9 @@ Resources::Font @font = null;
 string jsonFile = '';
 Json::Value jsonData = Json::Object();
 string jsonVersion = "1.4";
+#if SAVE_TEST
+string jsonSettingsVersion = "1.0";
+#endif
 
 // ui timing
 int lastEstimatedTime = 0;
@@ -1059,6 +1063,116 @@ void SaveFile() {
   Json::ToFile(jsonFile, jsonData);
 }
 
+#if SAVE_TEST
+string GetSettingsFile() {
+  string baseFolder = IO::FromDataFolder('');
+  string folder = baseFolder + 'BestCP';
+  if (!IO::FolderExists(folder)) {
+    IO::CreateFolder(folder);
+    DebugText("Created folder: " + folder);
+  }
+
+  return (folder + '/' + "settings" + ".json");
+}
+
+void SettingsLoad() {
+  string settingsFile = GetSettingsFile();
+  bool hasFile = !IO::FileExists(settingsFile);
+
+  DebugText("Loading settings - " + settingsFile + " hasFile?" + hasFile);
+
+  if (hasFile) {
+    // file doesnt exist, dont load
+    return;
+  }
+
+  Json::Value settingsData = Json::Object();
+
+  IO::File f(settingsFile);
+  f.Open(IO::FileMode::Read);
+  auto content = f.ReadToEnd();
+  f.Close();
+  if (content == "" || content == "null") {
+    DebugText("Invalid bestCPs settings file detected");
+    settingsData = Json::Object();
+  } else {
+    settingsData = Json::FromFile(settingsFile);
+  }
+
+  if (settingsData.HasKey("version") && settingsData.HasKey("data")) {
+    string version = settingsData["version"];
+    float versionFloat = Text::ParseFloat(version);
+    // 1.0 - first
+    Json::Value data = settingsData["data"];
+    string[] @keys = data.GetKeys();
+    Meta::Plugin @thisPlugin = Meta::ExecutingPlugin();
+    Meta::PluginSetting @[] @settings = thisPlugin.GetSettings();
+    for (int i = 0; i < keys.Length; i++) {
+      Json::Value settingData = data[keys[i]];
+      int type = settingData["type"];
+      print(keys[i] + " - " + type);
+      for (int q = 0; q < settings.Length; q++) {
+        if (keys[i] == settings[q].get_Name()) {
+          if (type == Meta::PluginSettingType::Bool) {
+            settings[q].WriteBool(settingData["value"]);
+          } else if (type == Meta::PluginSettingType::Float) {
+            settings[q].WriteFloat(settingData["value"]);
+          } else if (type == Meta::PluginSettingType::Int32) {
+            settings[q].WriteInt32(settingData["value"]);
+          } else if (type == Meta::PluginSettingType::Vec2) {
+            Json::Value vecData = settingData["value"];
+            vec2 vec2Value = vec2(vecData["x"] + 100, vecData["y"]);
+            settings[q].WriteVec2(vec2Value);
+            print(vec2Value);
+          }
+        }
+      }
+    }
+  }
+  print("done");
+}
+
+void SettingsSave() {
+  print("Running Settings Save");
+
+  Json::Value settingsData = Json::Object();
+  Json::Value settingsValuesData = Json::Object();
+
+  settingsData["version"] = jsonSettingsVersion;
+
+  Meta::Plugin @thisPlugin = Meta::ExecutingPlugin();
+  Meta::PluginSetting @[] @settings = thisPlugin.GetSettings();
+  for (int i = 0; i < settings.Length; i++) {
+    Json::Value arrayData = Json::Object();
+    Meta::PluginSetting @setting = settings[i];
+    string name = setting.get_Name();
+    arrayData["type"] = setting.get_Type();
+    if (setting.get_Type() == Meta::PluginSettingType::Bool) {
+      arrayData["value"] = setting.ReadBool();
+    } else if (setting.get_Type() == Meta::PluginSettingType::Float) {
+      arrayData["value"] = setting.ReadFloat();
+    } else if (setting.get_Type() == Meta::PluginSettingType::Int32) {
+      arrayData["value"] = setting.ReadInt32();
+    } else if (setting.get_Type() == Meta::PluginSettingType::Vec2) {
+      Json::Value vecData = Json::Object();
+      vecData["x"] = setting.ReadVec2().x;
+      vecData["y"] = setting.ReadVec2().y;
+      arrayData["value"] = vecData;
+    } else if (setting.get_Type() == Meta::PluginSettingType::String) {
+      arrayData["value"] = setting.ReadString();
+    } else {
+      print("Missing Settings data type");
+      print(name + " - " + setting.get_Type());
+    }
+    settingsValuesData[name] = arrayData;
+  }
+  settingsData["data"] = settingsValuesData;
+  Json::ToFile(GetSettingsFile(), settingsData);
+}
+#endif
+
+void OnEnabled() {}
+
 bool quickMultiLapEnableCache = false;
 void OnSettingsChanged() {
   if (resetMapData) {
@@ -1087,7 +1201,20 @@ void OnSettingsChanged() {
 
   // update quick
   quickMultiLapEnableCache = quickMultiLapEnable;
+
+#if SAVE_TEST
+  // openplanet settings saver is useless
+  // forgets my settings all the time
+  SettingsSave();
+#endif
 }
+
+#if SAVE_TEST
+void OnSettingsLoad(Settings::Section& section) {
+  print("OnSettingsLoad");
+  // SettingsLoad();
+}
+#endif
 
 // modified https://github.com/Phlarx/tm-ultimate-medals
 void Render() {
