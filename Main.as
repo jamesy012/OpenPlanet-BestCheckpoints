@@ -14,6 +14,7 @@ int currentLap = 0;
 int currCP = 0;
 
 int finishRaceTime = 0;
+int finishRealTime = 0;
 
 // map data
 int numCps = 0;
@@ -120,6 +121,7 @@ void ResetRace() {
   currentLap = 0;
   currCP = 0;
   finishRaceTime = 0;
+  finishRealTime = 0;
 
 #if TMNEXT
   lastCP = GetSpawnCheckpoint();
@@ -301,6 +303,7 @@ void Update(float dt) {
         resetData = true;
         isFinished = true;
         finishRaceTime = raceTime;
+        finishRealTime = Time::get_Now();
         if (pbTime == 0) {
           UpdatePersonalBestTimes();
         }
@@ -570,8 +573,13 @@ int GetPlayerCheckpointTime() {
 }
 
 int GetPlayerSpeed() {
+#if TMNEXT
   CSmScriptPlayer @smPlayerScript = GetPlayerScript();
   return smPlayerScript.DisplaySpeed;
+#else
+  CTrackManiaPlayer @smPlayer = GetPlayer();
+  return smPlayer.DisplaySpeed;
+#endif
 }
 
 #if TMNEXT
@@ -1364,7 +1372,8 @@ void Render() {
 
       bool isPBFaster = pbTime >= finishRaceTime;
 
-      uint minNum = Math::Min(bestTimesRec.Length, Math::Abs(numCheckpointsOnScreen));
+      uint minNum =
+          Math::Min(bestTimesRec.Length, Math::Abs(numCheckpointsOnScreen));
       uint offset = 0;
 
       if (minNum < bestTimesRec.Length) {
@@ -1379,7 +1388,7 @@ void Render() {
 
         if (isFinished) {
           int postOffset =
-              int((GetCurrentPlayerRaceTime() - finishRaceTime) /
+              int((Time::get_Now() - finishRealTime) /
                   (Math::Max(0.001f, finishedCheckpointCycleSpeed) * 1000.0f));
           offset += Math::Max(0, postOffset);
         }
@@ -1395,7 +1404,9 @@ void Render() {
 
         isRenderingCurrentCheckpoint =
             (int(i) == currCP && !invalidRun && darkenCurrentLap);
-        isRenderingCurrentCheckpoint = isRenderingCurrentCheckpoint || (i == 0 && minNum < bestTimesRec.Length && isFinished);
+        isRenderingCurrentCheckpoint =
+            isRenderingCurrentCheckpoint ||
+            (i == 0 && minNum < bestTimesRec.Length && isFinished);
 
         if (isRenderingCurrentCheckpoint) {
           UI::PushStyleColor(UI::Col::Text, vec4(0.7, 0.7, 0.7, 1.0));
