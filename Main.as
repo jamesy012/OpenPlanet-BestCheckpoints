@@ -269,7 +269,8 @@ void Update(float dt) {
     //   else {
     //     print("other update");
     //     print(int(bestTimesRec.Length) +"/"+ numCps);
-    if (int(bestTimesRec.Length) < numCps || isMultiLap) {
+    if (int(bestTimesRec.Length) < numCps ||
+        (isMultiLap && int(currLapTimesRec.Length) == numCps)) {
       CreateOrUpdateBestTime(cp, deltaTime, GetPlayerSpeed());
     }
     //   }
@@ -288,6 +289,7 @@ void Update(float dt) {
       DebugText("Finish lap");
       // turboCheckpointCounter = 0;
       lastCP = 0;
+      currCP = 0;
 #endif
       hasFinishedMap = true;
       currentLap++;
@@ -310,12 +312,10 @@ void Update(float dt) {
         if (pbTime == 0) {
           UpdatePersonalBestTimes();
         }
-      } else {
-        // not finished, reset currCP
-        currCP = 0;
-      }
-    }
-  }
+      }  // race finish
+    }    // lap finish
+
+  }  // change cp
 }
 
 void CreateOrUpdateCurrentTime(int checkpoint, int time, int speed) {
@@ -1000,8 +1000,8 @@ void LoadFile() {
             // 1.0 stored in seperate data, with no checkpoint index
             CreateOrUpdateBestTime(-1, jsonData[key], -1);
           } else {  // current
-            int speed = -1;
-            int pbSpeed = -1;
+            int speed = 0;
+            int pbSpeed = 0;
             if (versionFloat >= 1.4) {
               speed = jsonData[key]["speed"];
               pbSpeed = jsonData[key]["pbSpeed"];
@@ -1050,7 +1050,7 @@ void SaveFile() {
   }
 
   //#17 unsure what causes this, but best and pb times can become unsynced
-  //maybe saving the map before setting a pb time?
+  // maybe saving the map before setting a pb time?
   if (bestTimesRec.Length != pbTimesRec.Length) {
     print("Error when saving map data, checkpoint size mismatch");
     return;
@@ -1142,6 +1142,8 @@ void Render() {
   dataCols += BoolToInt(showBestPBDelta);
   // speed
   dataCols += BoolToInt(showCurrentSpeed);
+  dataCols += BoolToInt(shouldShowLastLapDelta && showLastLapSpeed);
+  dataCols += BoolToInt(shouldShowLastLapDelta && showLastLapSpeedDelta);
   dataCols += BoolToInt(showBestSpeed);
   dataCols += BoolToInt(showBestSpeedDelta);
   dataCols += BoolToInt(showPBSpeed);
@@ -1149,6 +1151,7 @@ void Render() {
 
   bool isDisplayingSomething = shouldShowEstimated || shouldShowTheoretical ||
                                shouldShowPersonalBest || showTopBestDelta ||
+                               (shouldShowLastLapDelta && showTopLapDelta) ||
                                showTopPBDelta || dataCols != 0;
 
   if (hideWithIFace) {
@@ -1291,6 +1294,29 @@ void Render() {
         DrawDeltaText(delta);
       }
 
+      if (shouldShowLastLapDelta && showTopLapDelta) {
+        UI::TableNextColumn();
+        string text = "Lap Delta:";
+        int delta = 0;
+        int cpTo = currCP;
+        if (currentLap == 0) {
+          cpTo = 0;
+        } else if (currCP == 0) {
+          // just passed start line, we want to show timings from the last lap
+          // untill we hit a checkpoint
+          cpTo = numCps;
+        }
+        for (uint i = 0; i < cpTo; i++) {
+          if (currLapTimesRec.Length > i && lastLapTimesRec.Length > i &&
+              lastLapTimesRec[i].time > 0) {
+            delta += currLapTimesRec[i].time - lastLapTimesRec[i].time;
+          }
+        }
+        UI::Text(text);
+        UI::SameLine();
+        DrawDeltaText(delta);
+      }
+
       UI::EndTable();
     }
 
@@ -1316,16 +1342,18 @@ void Render() {
           UI::Text("Current");
         }
 
-        if (shouldShowLastLapDelta && showLastLap) {
-          UI::TableNextColumn();
-          SetMinWidth(timeWidth);
-          UI::Text("Last Lap");
-        }
+        if (shouldShowLastLapDelta) {
+          if (showLastLap) {
+            UI::TableNextColumn();
+            SetMinWidth(timeWidth);
+            UI::Text("Last Lap");
+          }
 
-        if (shouldShowLastLapDelta && showLastLapDelta) {
-          UI::TableNextColumn();
-          SetMinWidth(timeWidth);
-          UI::Text("Lap Delta");
+          if (showLastLapDelta) {
+            UI::TableNextColumn();
+            SetMinWidth(timeWidth);
+            UI::Text("Lap Delta");
+          }
         }
 
         if (showBest) {
@@ -1357,6 +1385,18 @@ void Render() {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
           UI::Text("Speed");
+        }
+        if (shouldShowLastLapDelta) {
+          if (showLastLapSpeed) {
+            UI::TableNextColumn();
+            SetMinWidth(deltaWidth);
+            UI::Text("Lap Speed");
+          }
+          if (showLastLapSpeedDelta) {
+            UI::TableNextColumn();
+            SetMinWidth(deltaWidth);
+            UI::Text("Lap S. Delta");
+          }
         }
         if (showBestSpeed) {
           UI::TableNextColumn();
@@ -1524,6 +1564,24 @@ void Render() {
             UI::Text("" + currTimesRec[i].speed);
           }
         }
+        if (shouldShowLastLapDelta) {
+          if (showLastLapSpeed) {
+            UI::TableNextColumn();
+            if (currentLap != 0 && lastLapTimesRec.Length > i &&
+                lastLapTimesRec[i].speed != -1) {
+              UI::Text("" + lastLapTimesRec[i].speed);
+            }
+          }
+          if (showLastLapSpeedDelta) {
+            UI::TableNextColumn();
+            if (currentLap != 0 && isCurrentCPValid(i) &&
+                currLapTimesRec.Length > i && currLapTimesRec[i].speed != -1 &&
+                lastLapTimesRec.Length > i && lastLapTimesRec[i].speed != -1) {
+              int delta = currLapTimesRec[i].speed - lastLapTimesRec[i].speed;
+              DrawSpeedDeltaText(delta);
+            }
+          }
+        }
         if (showBestSpeed) {
           UI::TableNextColumn();
           if (bestTimesRec.Length > i) {
@@ -1551,6 +1609,7 @@ void Render() {
 
         if (isRenderingCurrentCheckpoint) {
           UI::PopStyleColor();
+          isRenderingCurrentCheckpoint = false;
         }
       }
 

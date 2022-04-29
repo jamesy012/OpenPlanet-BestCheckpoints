@@ -62,8 +62,11 @@ bool showPersonalBest = false;
 [Setting category="Window Bar Options" name="Show Delta against PB" description="will match the value the game displays on the screen"]
 bool showTopPBDelta = false;
 
-[Setting category="Window Bar Options" name="Show delta againt Best" description="will display the current delta against Best times"]
+[Setting category="Window Bar Options" name="Show delta against Best" description="will display the current delta against Best times"]
 bool showTopBestDelta = false;
+
+[Setting category="Window Bar Options" name="Show Lap delta against the Last (MultiLap)" description="will display the current delta against the last lap"]
+bool showTopLapDelta = false;
 
 // ---------------- Main Display Settings ------------
 
@@ -113,6 +116,12 @@ float finishedCheckpointCycleSpeed = 3.0f;
 
 [Setting category="Window Options speed" name="Show checkpoint speed" description="shows the speed the car hit the checkpoint at"]
 bool showCurrentSpeed = false;
+
+[Setting category="Window Options speed" name="Show last lap Speed (multi lap)" description="Adds last lap speed to the window (only for multi lap)"]
+bool showLastLapSpeed = false;
+
+[Setting category="Window Options speed" name="Show last lap Speed Delta (multi lap)" description="Adds delta of the last lap speed to the window (only for multi lap)"]
+bool showLastLapSpeedDelta = false;
 
 [Setting category="Window Options speed" name="Show best speed" description="Shows the highest speed you have gone through this checkpoint at"]
 bool showBestSpeed = false;
