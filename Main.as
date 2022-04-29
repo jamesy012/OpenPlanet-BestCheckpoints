@@ -14,7 +14,7 @@ int currentLap = 0;
 int currCP = 0;
 
 int finishRaceTime = 0;
-int finishRealTime = 0;
+int cpCycleFromTime = 0;
 
 // map data
 int numCps = 0;
@@ -55,6 +55,7 @@ Record @[] lastLapTimesRec;
 
 // extra
 bool waitForCarReset = true;
+bool hasPlayerRaced = false;
 bool resetData = true;
 int playerStartTime = -1;
 bool firstLoad = false;
@@ -121,7 +122,7 @@ void ResetRace() {
   currentLap = 0;
   currCP = 0;
   finishRaceTime = 0;
-  finishRealTime = 0;
+  cpCycleFromTime = Time::get_Now();
 
 #if TMNEXT
   lastCP = GetSpawnCheckpoint();
@@ -187,6 +188,8 @@ void Update(float dt) {
       if (numCps <= 1) {
         UpdateWaypoints();
       }
+
+      hasPlayerRaced = true;
 
       DebugText("Ready to read checkpoints");
     }
@@ -303,7 +306,7 @@ void Update(float dt) {
         resetData = true;
         isFinished = true;
         finishRaceTime = raceTime;
-        finishRealTime = Time::get_Now();
+        cpCycleFromTime = Time::get_Now();
         if (pbTime == 0) {
           UpdatePersonalBestTimes();
         }
@@ -1382,6 +1385,7 @@ void Render() {
       uint minNum =
           Math::Min(bestTimesRec.Length, Math::Abs(numCheckpointsOnScreen));
       uint offset = 0;
+      bool cycleThoughCheckpoints = isFinished || !hasPlayerRaced;
 
       if (minNum < bestTimesRec.Length) {
         if (currCP > int(minNum) / 2) {
@@ -1393,9 +1397,9 @@ void Render() {
           offset = int(bestTimesRec.Length) - minNum;
         }
 
-        if (isFinished) {
+        if (cycleThoughCheckpoints) {
           int postOffset =
-              int((Time::get_Now() - finishRealTime) /
+              int((Time::get_Now() - cpCycleFromTime) /
                   (Math::Max(0.001f, finishedCheckpointCycleSpeed) * 1000.0f));
           offset += Math::Max(0, postOffset);
         }
@@ -1404,7 +1408,7 @@ void Render() {
       for (uint q = 0; q < minNum; q++) {
         uint i = offset + q;
 
-        if (isMultiLap || isFinished) {
+        if (isMultiLap || cycleThoughCheckpoints) {
           i = i % bestTimesRec.Length;
         }
         UI::TableNextRow();
@@ -1413,7 +1417,7 @@ void Render() {
             (int(i) == currCP && !invalidRun && darkenCurrentLap);
         isRenderingCurrentCheckpoint =
             isRenderingCurrentCheckpoint ||
-            (i == 0 && minNum < bestTimesRec.Length && isFinished);
+            (i == 0 && minNum < bestTimesRec.Length && cycleThoughCheckpoints);
 
         if (isRenderingCurrentCheckpoint) {
           UI::PushStyleColor(UI::Col::Text, vec4(0.7, 0.7, 0.7, 1.0));
