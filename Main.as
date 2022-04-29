@@ -1046,6 +1046,13 @@ void SaveFile() {
     }
   }
 
+  //#17 unsure what causes this, but best and pb times can become unsynced
+  //maybe saving the map before setting a pb time?
+  if (bestTimesRec.Length != pbTimesRec.Length) {
+    print("Error when saving map data, checkpoint size mismatch");
+    return;
+  }
+
   jsonData = Json::Object();
 
   jsonData["version"] = jsonVersion;
