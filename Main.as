@@ -25,17 +25,20 @@ class Record {
   int checkpointId = -1;
   int time;
   int speed;
+  int speedAverage;
 
-  Record(int checkpointId, int time, int speed) {
+  Record(int checkpointId, int time, int speed, int speedAverage) {
     this.checkpointId = checkpointId;
     this.time = time;
     this.speed = speed;
+    this.speedAverage = speedAverage;
   }
 
   Record @opAssign(const Record& in record) {
     checkpointId = record.checkpointId;
     time = record.time;
     speed = record.speed;
+    speedAverage = record.speedAverage;
     return this;
   }
 }
@@ -52,6 +55,48 @@ int pbTime;
 // storage of which checkpoint we have been through
 Record @[] currLapTimesRec;
 Record @[] lastLapTimesRec;
+
+// speed Tracker
+class SpeedTracker {
+  int[] average;
+  int interval = 0.1f;
+  int lastCheck = -1;
+
+  int GetNumEntries() { return average.Length; }
+
+  int GetAverage() {
+    int length = GetNumEntries();
+    if (length == 0) {
+      return 0;
+    }
+    int value = 0;
+    for (int i = 0; i < length; i++) {
+      value += average[i];
+    }
+    return value / length;
+  }
+
+  void Reset() {
+    average = {};
+    lastCheck = -1;
+  }
+  void CheckpointReset() {
+    average = {};
+    lastCheck = -1;
+  }
+  void AddSpeed(int speed) {
+    average.InsertLast(speed);
+    lastCheck = GetCurrentPlayerRaceTime();
+  }
+  // adds a new time if the last check time is atleast an interval behind
+  void TryAddTime(int speed) {
+    int checkTime = GetCurrentPlayerRaceTime() - (interval * 1000.0f);
+    if (checkTime > lastCheck) {
+      AddSpeed(speed);
+    }
+  }
+};
+SpeedTracker speedTracker;
 
 // extra
 bool waitForCarReset = true;
@@ -123,6 +168,7 @@ void ResetRace() {
   currCP = 0;
   finishRaceTime = 0;
   cpCycleFromTime = Time::get_Now();
+  speedTracker.Reset();
 
 #if TMNEXT
   lastCP = GetSpawnCheckpoint();
@@ -217,6 +263,8 @@ void Update(float dt) {
   cp -= (currentLap * (numCps));
 #endif
 
+  speedTracker.TryAddTime(GetPlayerSpeed());
+
   // have we changed checkpoint?
   if (cp != lastCP) {
     DebugText("- Checkpoint change " + lastCP + "/" + cp);
@@ -244,7 +292,8 @@ void Update(float dt) {
     }
 
     // add our time (best current time for run)
-    CreateOrUpdateCurrentTime(cp, deltaTime, GetPlayerSpeed());
+    CreateOrUpdateCurrentTime(cp, deltaTime, GetPlayerSpeed(),
+                              speedTracker.GetAverage());
 
 #if TURBO || MP4
     DebugText(cp + " > " + numCps);
@@ -255,28 +304,17 @@ void Update(float dt) {
 #endif
 
     DebugText("NumCps:" + int(currLapTimesRec.Length) + "/" + numCps);
-    // update our best times, different logic for multilap
-    //   if (int(currLapTimesRec.Length) == numCps)
-    //   // turbo/mp4 hack, needs this for multilap to function?
-    // if TURBO || MP4
-    //       && currentLap == 0)
-    // endif
-    //   {
-    //     print("normal update");
-    //         CreateOrUpdateBestTime(cp, currLapTimesRec[currCP].time,
-    //                                currLapTimesRec[currCP].speed);
-    //       }
-    //   else {
-    //     print("other update");
-    //     print(int(bestTimesRec.Length) +"/"+ numCps);
+
     if (int(bestTimesRec.Length) < numCps ||
         (isMultiLap && int(currLapTimesRec.Length) == numCps)) {
-      CreateOrUpdateBestTime(cp, deltaTime, GetPlayerSpeed());
+      CreateOrUpdateBestTime(cp, deltaTime, GetPlayerSpeed(),
+                             speedTracker.GetAverage());
     }
     //   }
 
     // update time for laps
-    CreateOrUpdateCurrentLapTime(cp, deltaTime, GetPlayerSpeed());
+    CreateOrUpdateCurrentLapTime(cp, deltaTime, GetPlayerSpeed(),
+                                 speedTracker.GetAverage());
 
     currCP++;
 
@@ -315,10 +353,13 @@ void Update(float dt) {
       }  // race finish
     }    // lap finish
 
+    speedTracker.CheckpointReset();
+
   }  // change cp
 }
 
-void CreateOrUpdateCurrentTime(int checkpoint, int time, int speed) {
+void CreateOrUpdateCurrentTime(int checkpoint, int time, int speed,
+                               int speedAverage) {
   int recIndex = -1;
   for (uint i = 0; i < currTimesRec.Length; i++) {
     if (currTimesRec[i].checkpointId == checkpoint) {
@@ -328,7 +369,7 @@ void CreateOrUpdateCurrentTime(int checkpoint, int time, int speed) {
   }
 
   if (recIndex == -1) {
-    Record rec(checkpoint, time, speed);
+    Record rec(checkpoint, time, speed, speedAverage);
     currTimesRec.InsertLast(rec);
   } else {
     if (currTimesRec[recIndex].time > time) {
@@ -337,10 +378,14 @@ void CreateOrUpdateCurrentTime(int checkpoint, int time, int speed) {
     if (currTimesRec[recIndex].speed < speed) {
       currTimesRec[recIndex].speed = speed;
     }
+    if (currTimesRec[recIndex].speedAverage < speedAverage) {
+      currTimesRec[recIndex].speedAverage = speedAverage;
+    }
   }
 }
 
-void CreateOrUpdateBestTime(int checkpoint, int time, int speed) {
+void CreateOrUpdateBestTime(int checkpoint, int time, int speed,
+                            int speedAverage) {
   int recIndex = -1;
   for (uint i = 0; i < bestTimesRec.Length; i++) {
     if (bestTimesRec[i].checkpointId == checkpoint) {
@@ -350,7 +395,7 @@ void CreateOrUpdateBestTime(int checkpoint, int time, int speed) {
   }
 
   if (recIndex == -1) {
-    Record rec(checkpoint, time, speed);
+    Record rec(checkpoint, time, speed, speedAverage);
     bestTimesRec.InsertLast(rec);
   } else {
     if (bestTimesRec[recIndex].time > time) {
@@ -359,11 +404,15 @@ void CreateOrUpdateBestTime(int checkpoint, int time, int speed) {
     if (bestTimesRec[recIndex].speed < speed) {
       bestTimesRec[recIndex].speed = speed;
     }
+    if (bestTimesRec[recIndex].speedAverage < speedAverage) {
+      bestTimesRec[recIndex].speedAverage = speedAverage;
+    }
   }
 }
 
 // todo replace paramaters with Record reference
-void CreateOrUpdatePBTime(int checkpoint, int time, int speed) {
+void CreateOrUpdatePBTime(int checkpoint, int time, int speed,
+                          int speedAverage) {
   int recIndex = -1;
   for (uint i = 0; i < pbTimesRec.Length; i++) {
     if (pbTimesRec[i].checkpointId == checkpoint) {
@@ -373,17 +422,19 @@ void CreateOrUpdatePBTime(int checkpoint, int time, int speed) {
   }
 
   if (recIndex == -1) {
-    Record rec(checkpoint, time, speed);
+    Record rec(checkpoint, time, speed, speedAverage);
     pbTimesRec.InsertLast(rec);
   } else {
     // if (pbTimesRec[recIndex].time > time) {
     pbTimesRec[recIndex].time = time;
     pbTimesRec[recIndex].speed = speed;
+    pbTimesRec[recIndex].speedAverage = speedAverage;
     //}
   }
 }
 
-void CreateOrUpdateCurrentLapTime(int checkpoint, int time, int speed) {
+void CreateOrUpdateCurrentLapTime(int checkpoint, int time, int speed,
+                                  int speedAverage) {
   int recIndex = -1;
   for (uint i = 0; i < currLapTimesRec.Length; i++) {
     if (currLapTimesRec[i].checkpointId == checkpoint) {
@@ -393,14 +444,17 @@ void CreateOrUpdateCurrentLapTime(int checkpoint, int time, int speed) {
   }
 
   if (recIndex == -1) {
-    Record rec(checkpoint, time, speed);
+    Record rec(checkpoint, time, speed, speedAverage);
     currLapTimesRec.InsertLast(rec);
-    lastLapTimesRec.InsertLast(Record(checkpoint, -1, -1));
+    lastLapTimesRec.InsertLast(Record(checkpoint, -1, -1, -1));
   } else {
     lastLapTimesRec[recIndex].time = currLapTimesRec[recIndex].time;
     lastLapTimesRec[recIndex].speed = currLapTimesRec[recIndex].speed;
+    lastLapTimesRec[recIndex].speedAverage =
+        currLapTimesRec[recIndex].speedAverage;
     currLapTimesRec[recIndex].time = time;
     currLapTimesRec[recIndex].speed = speed;
+    currLapTimesRec[recIndex].speedAverage = speedAverage;
   }
 }
 
@@ -410,7 +464,7 @@ void UpdatePersonalBestTimes() {
     pbTime = finishRaceTime;
     for (uint i = 0; i < currTimesRec.Length; i++) {
       CreateOrUpdatePBTime(currTimesRec[i].checkpointId, currTimesRec[i].time,
-                           currTimesRec[i].speed);
+                           currTimesRec[i].speed, currTimesRec[i].speedAverage);
     }
     // Final checkpoint is finish, can have multiple finish checkpoints, so this
     // overides that
@@ -443,6 +497,9 @@ void UpdateSaveBestData() {
       }
       if (currTimesRec[i].speed > bestTimesRec[i].speed) {
         bestTimesRec[i].speed = currTimesRec[i].speed;
+      }
+      if (currTimesRec[i].speedAverage > bestTimesRec[i].speedAverage) {
+        bestTimesRec[i].speedAverage = currTimesRec[i].speedAverage;
       }
     }
 
@@ -998,19 +1055,23 @@ void LoadFile() {
         if (jsonData.HasKey(key)) {
           if (version == "1.0") {
             // 1.0 stored in seperate data, with no checkpoint index
-            CreateOrUpdateBestTime(-1, jsonData[key], -1);
+            CreateOrUpdateBestTime(-1, jsonData[key], -1, -1);
           } else {  // current
             int speed = 0;
             int pbSpeed = 0;
+            int speedAverage = 0;
             if (versionFloat >= 1.4) {
               speed = jsonData[key]["speed"];
               pbSpeed = jsonData[key]["pbSpeed"];
             }
+            if (versionFloat >= 1.5) {
+              speedAverage = jsonData[key]["speedAverage"];
+            }
             CreateOrUpdateBestTime(jsonData[key]["cp"], jsonData[key]["time"],
-                                   speed);
+                                   speed, speedAverage);
             if (versionFloat >= 1.2) {
               CreateOrUpdatePBTime(jsonData[key]["cp"], jsonData[key]["pbTime"],
-                                   pbSpeed);
+                                   pbSpeed, speedAverage);
             }
           }
         } else {
@@ -1148,6 +1209,14 @@ void Render() {
   dataCols += BoolToInt(showBestSpeedDelta);
   dataCols += BoolToInt(showPBSpeed);
   dataCols += BoolToInt(showPBSpeedDelta);
+  // Average Speed
+  dataCols += BoolToInt(showCurrentAverageSpeed);
+  dataCols += BoolToInt(shouldShowLastLapDelta && showLastLapAverageSpeed);
+  dataCols += BoolToInt(shouldShowLastLapDelta && showLastLapAverageSpeedDelta);
+  dataCols += BoolToInt(showBestAverageSpeed);
+  dataCols += BoolToInt(showBestAverageSpeedDelta);
+  dataCols += BoolToInt(showPBAverageSpeed);
+  dataCols += BoolToInt(showPBAverageSpeedDelta);
 
   bool isDisplayingSomething = shouldShowEstimated || shouldShowTheoretical ||
                                shouldShowPersonalBest || showTopBestDelta ||
@@ -1418,6 +1487,43 @@ void Render() {
           SetMinWidth(deltaWidth);
           UI::Text("PB. S. Delta");
         }
+        if (showCurrentAverageSpeed) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("A. speed");
+        }
+        if (shouldShowLastLapDelta) {
+          if (showLastLapAverageSpeed) {
+            UI::TableNextColumn();
+            SetMinWidth(deltaWidth);
+            UI::Text("Lap A. speed");
+          }
+          if (showLastLapAverageSpeedDelta) {
+            UI::TableNextColumn();
+            SetMinWidth(deltaWidth);
+            UI::Text("Lap A. S. Delta");
+          }
+        }
+        if (showBestAverageSpeed) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("A. B. speed");
+        }
+        if (showBestAverageSpeedDelta) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("A. B. S. Delta");
+        }
+        if (showPBAverageSpeed) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("A. PB. speed");
+        }
+        if (showPBAverageSpeedDelta) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("A. PB. S. Delta");
+        }
       }
 
       bool isPBFaster = pbTime >= finishRaceTime;
@@ -1604,6 +1710,61 @@ void Render() {
           UI::TableNextColumn();
           if (pbTimesRec.Length > i && currTimesRec.Length > i) {
             DrawSpeedDeltaText(pbTimesRec[i].speed - currTimesRec[i].speed);
+          }
+        }
+
+        // speedAverage
+        if (showCurrentAverageSpeed) {
+          UI::TableNextColumn();
+          if (currTimesRec.Length > i) {
+            UI::Text("" + currTimesRec[i].speedAverage);
+          }
+        }
+        if (shouldShowLastLapDelta) {
+          if (showLastLapAverageSpeed) {
+            UI::TableNextColumn();
+            if (currentLap != 0 && lastLapTimesRec.Length > i &&
+                lastLapTimesRec[i].speedAverage != -1) {
+              UI::Text("" + lastLapTimesRec[i].speedAverage);
+            }
+          }
+          if (showLastLapAverageSpeedDelta) {
+            UI::TableNextColumn();
+            if (currentLap != 0 && isCurrentCPValid(i) &&
+                currLapTimesRec.Length > i &&
+                currLapTimesRec[i].speedAverage != -1 &&
+                lastLapTimesRec.Length > i &&
+                lastLapTimesRec[i].speedAverage != -1) {
+              int delta = currLapTimesRec[i].speedAverage -
+                          lastLapTimesRec[i].speedAverage;
+              DrawSpeedDeltaText(delta);
+            }
+          }
+        }
+        if (showBestAverageSpeed) {
+          UI::TableNextColumn();
+          if (bestTimesRec.Length > i) {
+            UI::Text("" + bestTimesRec[i].speedAverage);
+          }
+        }
+        if (showBestAverageSpeedDelta) {
+          UI::TableNextColumn();
+          if (bestTimesRec.Length > i && currTimesRec.Length > i) {
+            DrawSpeedDeltaText(bestTimesRec[i].speedAverage -
+                               currTimesRec[i].speedAverage);
+          }
+        }
+        if (showPBAverageSpeed) {
+          UI::TableNextColumn();
+          if (pbTimesRec.Length > i) {
+            UI::Text("" + pbTimesRec[i].speedAverage);
+          }
+        }
+        if (showPBAverageSpeedDelta) {
+          UI::TableNextColumn();
+          if (pbTimesRec.Length > i && currTimesRec.Length > i) {
+            DrawSpeedDeltaText(pbTimesRec[i].speedAverage -
+                               currTimesRec[i].speedAverage);
           }
         }
 

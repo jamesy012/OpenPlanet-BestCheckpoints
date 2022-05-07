@@ -117,10 +117,10 @@ float finishedCheckpointCycleSpeed = 3.0f;
 [Setting category="Window Options speed" name="Show checkpoint speed" description="shows the speed the car hit the checkpoint at"]
 bool showCurrentSpeed = false;
 
-[Setting category="Window Options speed" name="Show last lap Speed (multi lap)" description="Adds last lap speed to the window (only for multi lap)"]
+[Setting category="Window Options speed" name="Show last lap speed (multi lap)" description="Adds last lap speed to the window (only for multi lap)"]
 bool showLastLapSpeed = false;
 
-[Setting category="Window Options speed" name="Show last lap Speed Delta (multi lap)" description="Adds delta of the last lap speed to the window (only for multi lap)"]
+[Setting category="Window Options speed" name="Show last lap speed Delta (multi lap)" description="Adds delta of the last lap speed to the window (only for multi lap)"]
 bool showLastLapSpeedDelta = false;
 
 [Setting category="Window Options speed" name="Show best speed" description="Shows the highest speed you have gone through this checkpoint at"]
@@ -134,6 +134,27 @@ bool showPBSpeed = false;
 
 [Setting category="Window Options speed" name="Show PB to current speed Delta" description="shows Delta between last PB speed and current speed"]
 bool showPBSpeedDelta = false;
+//average speed
+[Setting category="Window Options speed" name="Show checkpoint average speed" description="shows the average speed the car hit the checkpoint at"]
+bool showCurrentAverageSpeed = false;
+
+[Setting category="Window Options speed" name="Show last lap average speed (multi lap)" description="Adds last lap average speed to the window (only for multi lap)"]
+bool showLastLapAverageSpeed = false;
+
+[Setting category="Window Options speed" name="Show last lap average speed Delta (multi lap)" description="Adds delta of the last lap average speed to the window (only for multi lap)"]
+bool showLastLapAverageSpeedDelta = false;
+
+[Setting category="Window Options speed" name="Show best average speed" description="Shows the highest average speed you have gone through this checkpoint at"]
+bool showBestAverageSpeed = false;
+
+[Setting category="Window Options speed" name="Show best to current average speed Delta" description="shows Delta between best and current average speed"]
+bool showBestAverageSpeedDelta = false;
+
+[Setting category="Window Options speed" name="Show PB average speed" description="Shows the average speed you have gone through this checkpoint for the last stored PB"]
+bool showPBAverageSpeed = false;
+
+[Setting category="Window Options speed" name="Show PB to current average speed Delta" description="shows Delta between last PB average speed and current average speed"]
+bool showPBAverageSpeedDelta = false;
 
 
 // ---------------- JSON Data settings ------------
