@@ -68,6 +68,9 @@ bool showTopBestDelta = false;
 [Setting category="Window Bar Options" name="Show Lap delta against the Last (MultiLap)" description="will display the current delta against the last lap"]
 bool showTopLapDelta = false;
 
+[Setting category="Window Bar Options" name="Show checkpoint average speed Value" description="will display the current average speed for this checkpoint"]
+bool showTopCPAverageSpeed = false;
+
 // ---------------- Main Display Settings ------------
 
 [Setting category="Window Options" name="Show checkpoints" description="Adds a number to the left for each checkpoint in the map"]

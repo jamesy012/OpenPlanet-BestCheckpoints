@@ -115,7 +115,7 @@ Resources::Font @font = null;
 // file io
 string jsonFile = '';
 Json::Value jsonData = Json::Object();
-string jsonVersion = "1.4";
+string jsonVersion = "1.5";
 
 // ui timing
 int lastEstimatedTime = 0;
@@ -1060,18 +1060,20 @@ void LoadFile() {
             int speed = 0;
             int pbSpeed = 0;
             int speedAverage = 0;
+            int pbSpeedAverage = 0;
             if (versionFloat >= 1.4) {
               speed = jsonData[key]["speed"];
               pbSpeed = jsonData[key]["pbSpeed"];
             }
             if (versionFloat >= 1.5) {
               speedAverage = jsonData[key]["speedAverage"];
+              pbSpeedAverage = jsonData[key]["pbSpeedAverage"];
             }
             CreateOrUpdateBestTime(jsonData[key]["cp"], jsonData[key]["time"],
                                    speed, speedAverage);
             if (versionFloat >= 1.2) {
               CreateOrUpdatePBTime(jsonData[key]["cp"], jsonData[key]["pbTime"],
-                                   pbSpeed, speedAverage);
+                                   pbSpeed, pbSpeedAverage);
             }
           }
         } else {
@@ -1129,8 +1131,10 @@ void SaveFile() {
     Json::Value arrayData = Json::Object();
     arrayData["time"] = bestTimesRec[i].time;
     arrayData["speed"] = bestTimesRec[i].speed;
+    arrayData["speedAverage"] = bestTimesRec[i].speedAverage;
     arrayData["pbTime"] = pbTimesRec[i].time;
     arrayData["pbSpeed"] = pbTimesRec[i].speed;
+    arrayData["pbSpeedAverage"] = pbTimesRec[i].speedAverage;
     arrayData["cp"] = bestTimesRec[i].checkpointId;
     jsonData["" + i] = arrayData;
   }
@@ -1221,6 +1225,7 @@ void Render() {
   bool isDisplayingSomething = shouldShowEstimated || shouldShowTheoretical ||
                                shouldShowPersonalBest || showTopBestDelta ||
                                (shouldShowLastLapDelta && showTopLapDelta) ||
+                               showTopCPAverageSpeed ||
                                showTopPBDelta || dataCols != 0;
 
   if (hideWithIFace) {
@@ -1384,6 +1389,13 @@ void Render() {
         UI::Text(text);
         UI::SameLine();
         DrawDeltaText(delta);
+      }
+
+      if(showTopCPAverageSpeed){
+          UI::TableNextColumn();
+          string text = "Average Speed: ";
+          text += "" + speedTracker.GetAverage();
+          UI::Text(text);
       }
 
       UI::EndTable();
