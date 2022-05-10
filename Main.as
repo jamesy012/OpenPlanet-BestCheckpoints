@@ -635,7 +635,12 @@ int GetPlayerCheckpointTime() {
 int GetPlayerSpeed() {
 #if TMNEXT
   CSmScriptPlayer @smPlayerScript = GetPlayerScript();
-  return smPlayerScript.DisplaySpeed;
+  int speed = smPlayerScript.DisplaySpeed;
+  if (speed == 0) {
+    //backup incase DisplaySpeed is 0 #18
+    speed = smPlayerScript.Velocity.Length() * 3.6f;
+  }
+  return speed;
 #else
   CTrackManiaPlayer @smPlayer = GetPlayer();
   return smPlayer.DisplaySpeed;
