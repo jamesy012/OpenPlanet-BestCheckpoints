@@ -58,40 +58,38 @@ Record @[] lastLapTimesRec;
 
 // speed Tracker
 class SpeedTracker {
-  int[] average;
-  int interval = 0.1f;
+  int averageTotal;
+  int averageNum;
+  float interval = 0.0f;
   int lastCheck = -1;
 
-  int GetNumEntries() { return average.Length; }
+  int GetNumEntries() { return averageNum; }
 
   int GetAverage() {
     int length = GetNumEntries();
     if (length == 0) {
       return 0;
     }
-    int value = 0;
-    for (int i = 0; i < length; i++) {
-      value += average[i];
-    }
-    return value / length;
+    return averageTotal / length;
   }
 
-  void Reset() {
-    average = {};
-    lastCheck = -1;
-  }
+  void Reset() { CheckpointReset(); }
   void CheckpointReset() {
-    average = {};
+    averageTotal = 0;
+    averageNum = 0;
     lastCheck = -1;
   }
   void AddSpeed(int speed) {
-    average.InsertLast(speed);
+    averageTotal += speed;
+    averageNum += 1;
     lastCheck = GetCurrentPlayerRaceTime();
   }
   // adds a new time if the last check time is atleast an interval behind
   void TryAddTime(int speed) {
-    int checkTime = GetCurrentPlayerRaceTime() - (interval * 1000.0f);
+    int checkTime = GetCurrentPlayerRaceTime() - int(interval * 1000.0f);
     if (checkTime > lastCheck) {
+      // should take into account slowmo, average is skewed when slowmo is
+      // affecting the car
       AddSpeed(speed);
     }
   }
@@ -637,13 +635,18 @@ int GetPlayerSpeed() {
   CSmScriptPlayer @smPlayerScript = GetPlayerScript();
   int speed = smPlayerScript.DisplaySpeed;
   if (speed == 0) {
-    //backup incase DisplaySpeed is 0 #18
-    speed = smPlayerScript.Velocity.Length() * 3.6f;
+    // backup incase DisplaySpeed is 0 #18
+    speed = int(Math::Round(smPlayerScript.Velocity.Length() * 3.6f));
   }
   return speed;
 #else
   CTrackManiaPlayer @smPlayer = GetPlayer();
-  return smPlayer.DisplaySpeed;
+  int speed = smPlayer.DisplaySpeed;
+  if (speed == 0) {
+    // backup incase DisplaySpeed is 0 #18
+    speed = int(Math::Round(smPlayer.Speed * 3.6f));
+  }
+  return speed;
 #endif
 }
 
@@ -886,10 +889,10 @@ void UpdateWaypoints() {
   auto map = GetApp().RootMap;
 #elif TURBO
   auto map = GetApp().Challenge;
+#endif
   if (map is null) {
     return;
   }
-#endif
   numLaps = map.TMObjective_NbLaps;
   isMultiLap = map.TMObjective_IsLapRace;
   DebugText("Map Laps: " + numLaps + " Is MultiLap: " + isMultiLap);
@@ -1227,11 +1230,10 @@ void Render() {
   dataCols += BoolToInt(showPBAverageSpeed);
   dataCols += BoolToInt(showPBAverageSpeedDelta);
 
-  bool isDisplayingSomething = shouldShowEstimated || shouldShowTheoretical ||
-                               shouldShowPersonalBest || showTopBestDelta ||
-                               (shouldShowLastLapDelta && showTopLapDelta) ||
-                               showTopCPAverageSpeed ||
-                               showTopPBDelta || dataCols != 0;
+  bool isDisplayingSomething =
+      shouldShowEstimated || shouldShowTheoretical || shouldShowPersonalBest ||
+      showTopBestDelta || (shouldShowLastLapDelta && showTopLapDelta) ||
+      showTopCPAverageSpeed || showTopPBDelta || dataCols != 0;
 
   if (hideWithIFace) {
     auto playground = app.CurrentPlayground;
@@ -1290,9 +1292,10 @@ void Render() {
       avaliableTopBar = 2;
     }
 
-    if (hasFinishedMap && UI::BeginTable("info", avaliableTopBar / 2,
-                                         UI::TableFlags::SizingFixedFit)) {
-      if (shouldShowTheoretical) {
+    if (UI::BeginTable("info", avaliableTopBar / 2,
+                       UI::TableFlags::SizingFixedFit)) {
+            PushPBColor();
+      if (hasFinishedMap && shouldShowTheoretical) {
         UI::TableNextColumn();
         string text = "Optimal: ";
         // show lowest if we have finished or on a seperate lap
@@ -1313,7 +1316,7 @@ void Render() {
         UI::Text(text);
       }
 
-      if (shouldShowEstimated) {
+      if (hasFinishedMap && shouldShowEstimated) {
         int time = 0;
         if (currCP != 0 || !isMultiLap ||
             int(currLapTimesRec.Length) != numCps) {
@@ -1338,14 +1341,14 @@ void Render() {
         }
       }
 
-      if (shouldShowPersonalBest) {
+      if (hasFinishedMap && shouldShowPersonalBest) {
         UI::TableNextColumn();
         string text = "PB: ";
         text += Time::Format(pbTime);
         UI::Text(text);
       }
 
-      if (showTopPBDelta) {
+      if (hasFinishedMap && showTopPBDelta) {
         UI::TableNextColumn();
         string text = "PB Delta:";
         int delta = 0;
@@ -1358,8 +1361,9 @@ void Render() {
         UI::SameLine();
         DrawDeltaText(delta);
       }
+      PopPBColor();
 
-      if (showTopBestDelta) {
+      if (hasFinishedMap && showTopBestDelta) {
         UI::TableNextColumn();
         string text = "Best Delta:";
         int delta = 0;
@@ -1373,7 +1377,7 @@ void Render() {
         DrawDeltaText(delta);
       }
 
-      if (shouldShowLastLapDelta && showTopLapDelta) {
+      if (hasFinishedMap && shouldShowLastLapDelta && showTopLapDelta) {
         UI::TableNextColumn();
         string text = "Lap Delta:";
         int delta = 0;
@@ -1385,7 +1389,8 @@ void Render() {
           // untill we hit a checkpoint
           cpTo = numCps;
         }
-        for (uint i = 0; i < cpTo; i++) {
+        cpTo = Math::Max(0, cpTo);
+        for (uint i = 0; i < uint(cpTo); i++) {
           if (currLapTimesRec.Length > i && lastLapTimesRec.Length > i &&
               lastLapTimesRec[i].time > 0) {
             delta += currLapTimesRec[i].time - lastLapTimesRec[i].time;
@@ -1396,11 +1401,11 @@ void Render() {
         DrawDeltaText(delta);
       }
 
-      if(showTopCPAverageSpeed){
-          UI::TableNextColumn();
-          string text = "Average Speed: ";
-          text += "" + speedTracker.GetAverage();
-          UI::Text(text);
+      if (showTopCPAverageSpeed) {
+        UI::TableNextColumn();
+        string text = "Average Speed: ";
+        text += "" + speedTracker.GetAverage();
+        UI::Text(text);
       }
 
       UI::EndTable();
@@ -1452,6 +1457,8 @@ void Render() {
           SetMinWidth(deltaWidth);
           UI::Text("B. Delta");
         }
+
+        PushPBColor();
         if (showPB) {
           UI::TableNextColumn();
           SetMinWidth(timeWidth);
@@ -1462,11 +1469,14 @@ void Render() {
           SetMinWidth(deltaWidth);
           UI::Text("PB. Delta");
         }
+
         if (showBestPBDelta) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
           UI::Text("B-PB. Delta");
         }
+        PopPBColor();
+
         if (showCurrentSpeed) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
@@ -1494,6 +1504,8 @@ void Render() {
           SetMinWidth(deltaWidth);
           UI::Text("B. S. Delta");
         }
+
+        PushPBColor();
         if (showPBSpeed) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
@@ -1504,6 +1516,8 @@ void Render() {
           SetMinWidth(deltaWidth);
           UI::Text("PB. S. Delta");
         }
+        PopPBColor();
+
         if (showCurrentAverageSpeed) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
@@ -1531,6 +1545,8 @@ void Render() {
           SetMinWidth(deltaWidth);
           UI::Text("A. B. S. Delta");
         }
+
+        PushPBColor();
         if (showPBAverageSpeed) {
           UI::TableNextColumn();
           SetMinWidth(deltaWidth);
@@ -1541,9 +1557,8 @@ void Render() {
           SetMinWidth(deltaWidth);
           UI::Text("A. PB. S. Delta");
         }
+        PopPBColor();
       }
-
-      bool isPBFaster = pbTime >= finishRaceTime;
 
       uint minNum =
           Math::Min(bestTimesRec.Length, Math::Abs(numCheckpointsOnScreen));
@@ -1641,21 +1656,12 @@ void Render() {
         }
 
         if (pbTimesRec.Length > i) {
+          PushPBColor();
+
           // Personal Best
           if (showPB) {
             UI::TableNextColumn();
-            // colors here are useless?
-            if (showPBColor && isFinished) {
-              if (isPBFaster) {
-                UI::PushStyleColor(UI::Col::Text, vec4(1.0, 1.0, 1.0, 1.0));
-              } else {
-                UI::PushStyleColor(UI::Col::Text, vec4(1.0, 0.0, 0.0, 1.0));
-              }
-            }
             UI::Text(Time::Format(pbTimesRec[i].time));
-            if (showPBColor && isFinished) {
-              UI::PopStyleColor();
-            }
           }
           if (showPBDelta) {
             UI::TableNextColumn();
@@ -1664,6 +1670,7 @@ void Render() {
               DrawDeltaText(delta);
             }
           }
+
           if (showBestPBDelta) {
             UI::TableNextColumn();
             int compTime = pbTimesRec[i].time;
@@ -1675,6 +1682,8 @@ void Render() {
             int delta = compTime - bestTimesRec[i].time;
             DrawDeltaText(delta);
           }
+
+          PopPBColor();
         } else {
           UI::TableNextColumn();
           UI::TableNextColumn();
@@ -1717,6 +1726,8 @@ void Render() {
             DrawSpeedDeltaText(bestTimesRec[i].speed - currTimesRec[i].speed);
           }
         }
+
+        PushPBColor();
         if (showPBSpeed) {
           UI::TableNextColumn();
           if (pbTimesRec.Length > i) {
@@ -1729,6 +1740,7 @@ void Render() {
             DrawSpeedDeltaText(pbTimesRec[i].speed - currTimesRec[i].speed);
           }
         }
+        PopPBColor();
 
         // speedAverage
         if (showCurrentAverageSpeed) {
@@ -1771,6 +1783,7 @@ void Render() {
                                currTimesRec[i].speedAverage);
           }
         }
+        PushPBColor();
         if (showPBAverageSpeed) {
           UI::TableNextColumn();
           if (pbTimesRec.Length > i) {
@@ -1784,6 +1797,7 @@ void Render() {
                                currTimesRec[i].speedAverage);
           }
         }
+        PopPBColor();
 
         if (isRenderingCurrentCheckpoint) {
           UI::PopStyleColor();
@@ -1802,6 +1816,22 @@ void Render() {
   }
 
   if (invalidRun) {
+    UI::PopStyleColor();
+  }
+}
+
+void PushPBColor() {
+  if (showPBColor && isFinished) {
+    if (pbTime >= finishRaceTime) {
+      UI::PushStyleColor(UI::Col::Text, vec4(1.0, 1.0, 1.0, 1.0));
+    } else {
+      UI::PushStyleColor(UI::Col::Text, vec4(1.0, 0.0, 0.0, 1.0));
+    }
+  }
+}
+
+void PopPBColor() {
+  if (showPBColor && isFinished) {
     UI::PopStyleColor();
   }
 }

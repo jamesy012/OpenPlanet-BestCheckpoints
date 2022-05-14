@@ -18,6 +18,24 @@ Saves your best times to load whenever you come back to the map
 
 # Updates
 
+##### 1.5.1
+
+Added Average speed
+
+backup for getting speed, sometimes it was getting a 0 speed value
+
+made the slower pb's a little easier to understand, is also likely the cause of 0 speed PB times
+
+## 1.5
+
+Fix for game api update which prevented the plugin from running
+
+Vehicle Speed tracking at checkpoints
+
+UI fixes/Requests from Discord top info bar responds to width of window limit to number of checkpoints on screen at once few more options available in the settings for showing speed
+
+fixed crash on data save from messed up data size
+
 ##### 1.4.1
 
 Fix for game api update which prevented the plugin from running
