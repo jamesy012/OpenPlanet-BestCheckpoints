@@ -24,9 +24,6 @@ int fontSize = 16;
 [Setting category="Options" name="Enable Logging" description="will start logging text to get an idea about what the programs doing"]
 bool enableLogging = false;
 
-[Setting category="Options" name="Save on run complete" description="Only stores/updates best times when a run is finished."]
-bool saveWhenCompleted = true;
-
 [Setting category="Options" name="Multi lap data override" description="should we let multi laps override our fastest time's (false will only use the first lap's time)"]
 bool multiLapOverride = true;
 
@@ -159,11 +156,19 @@ bool showPBAverageSpeed = false;
 [Setting category="Window Options speed" name="Show PB to current average speed Delta" description="shows Delta between last PB average speed and current average speed"]
 bool showPBAverageSpeedDelta = false;
 
+#if false
+// ---------------- comparison settings ------------
+[Setting category="STM comparison" name="showSTMcomparison" description="showSTMcomparison"]
+bool showSTMcomparison = true;
+#endif
 
 // ---------------- JSON Data settings ------------
 
 [Setting category="Data" name="Save on disk" description="Stops saving data to disk - When this is disabled you will be able to load old data"]
 bool saveData = true;
+
+[Setting category="Data" name="Only Save on run complete" description="Only stores/updates best times when a run is finished."]
+bool saveWhenCompleted = true;
 
 [Setting category="Data" name="Reset Data for Map" description="This will clear the best times for this map (does not delete file)"]
 bool resetMapData = false;

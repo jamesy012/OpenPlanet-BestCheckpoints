@@ -1,6 +1,7 @@
 // openplanet doesnt like comments on same line as #if statement?
 // just here for visual studio code intellisense help
 #if __INTELLISENSE__
+#include "STMCPTimes.h"
 #include "Settings.as"
 #include "cppIntellisense.h"
 #endif
@@ -180,6 +181,8 @@ void Update(float dt) {
   // have we changed map?
   if (currentMap != GetMapId()) {
     DebugText("map mismatch");
+    DebugText("MapID: " + GetMapId());
+    DebugText("CurrentMap: " + currentMap);
 
     // we have left the map, lets save our data before we lose it
     if (currentMap != "") {
@@ -1070,18 +1073,34 @@ void LoadFile() {
             int speedAverage = 0;
             int pbSpeedAverage = 0;
             if (versionFloat >= 1.4) {
-              speed = jsonData[key]["speed"];
-              pbSpeed = jsonData[key]["pbSpeed"];
+              if (jsonData[key].HasKey("speed")) {
+                speed = jsonData[key]["speed"];
+              }
+              if (jsonData[key].HasKey("pbSpeed")) {
+                pbSpeed = jsonData[key]["pbSpeed"];
+              }
             }
             if (versionFloat >= 1.5) {
-              speedAverage = jsonData[key]["speedAverage"];
-              pbSpeedAverage = jsonData[key]["pbSpeedAverage"];
+              if (jsonData[key].HasKey("speedAverage")) {
+                speedAverage = jsonData[key]["speedAverage"];
+              }
+              if (jsonData[key].HasKey("pbSpeedAverage")) {
+                pbSpeedAverage = jsonData[key]["pbSpeedAverage"];
+              }
             }
-            CreateOrUpdateBestTime(jsonData[key]["cp"], jsonData[key]["time"],
-                                   speed, speedAverage);
-            if (versionFloat >= 1.2) {
-              CreateOrUpdatePBTime(jsonData[key]["cp"], jsonData[key]["pbTime"],
-                                   pbSpeed, pbSpeedAverage);
+            if (jsonData[key].HasKey("cp")) {
+              if (jsonData[key].HasKey("time")) {
+                CreateOrUpdateBestTime(jsonData[key]["cp"],
+                                       jsonData[key]["time"], speed,
+                                       speedAverage);
+              }
+              if (versionFloat >= 1.2) {
+                if (jsonData[key].HasKey("pbTime")) {
+                  CreateOrUpdatePBTime(jsonData[key]["cp"],
+                                       jsonData[key]["pbTime"], pbSpeed,
+                                       pbSpeedAverage);
+                }
+              }
             }
           }
         } else {
@@ -1120,13 +1139,6 @@ void SaveFile() {
     }
   }
 
-  //#17 unsure what causes this, but best and pb times can become unsynced
-  // maybe saving the map before setting a pb time?
-  if (bestTimesRec.Length != pbTimesRec.Length) {
-    print("Error when saving map data, checkpoint size mismatch");
-    return;
-  }
-
   jsonData = Json::Object();
 
   jsonData["version"] = jsonVersion;
@@ -1137,13 +1149,16 @@ void SaveFile() {
 
   for (uint i = 0; i < bestTimesRec.Length; i++) {
     Json::Value arrayData = Json::Object();
+    arrayData["cp"] = bestTimesRec[i].checkpointId;
+
     arrayData["time"] = bestTimesRec[i].time;
     arrayData["speed"] = bestTimesRec[i].speed;
     arrayData["speedAverage"] = bestTimesRec[i].speedAverage;
-    arrayData["pbTime"] = pbTimesRec[i].time;
-    arrayData["pbSpeed"] = pbTimesRec[i].speed;
-    arrayData["pbSpeedAverage"] = pbTimesRec[i].speedAverage;
-    arrayData["cp"] = bestTimesRec[i].checkpointId;
+    if (pbTimesRec.Length > i) {
+      arrayData["pbTime"] = pbTimesRec[i].time;
+      arrayData["pbSpeed"] = pbTimesRec[i].speed;
+      arrayData["pbSpeedAverage"] = pbTimesRec[i].speedAverage;
+    }
     jsonData["" + i] = arrayData;
   }
 
@@ -1229,6 +1244,9 @@ void Render() {
   dataCols += BoolToInt(showBestAverageSpeedDelta);
   dataCols += BoolToInt(showPBAverageSpeed);
   dataCols += BoolToInt(showPBAverageSpeedDelta);
+#if false
+  dataCols += BoolToInt(showSTMcomparison);
+#endif
 
   bool isDisplayingSomething =
       shouldShowEstimated || shouldShowTheoretical || shouldShowPersonalBest ||
@@ -1294,7 +1312,7 @@ void Render() {
 
     if (UI::BeginTable("info", avaliableTopBar / 2,
                        UI::TableFlags::SizingFixedFit)) {
-            PushPBColor();
+      PushPBColor();
       if (hasFinishedMap && shouldShowTheoretical) {
         UI::TableNextColumn();
         string text = "Optimal: ";
@@ -1558,19 +1576,28 @@ void Render() {
           UI::Text("A. PB. S. Delta");
         }
         PopPBColor();
-      }
+#if false
+        if (showSTMcomparison) {
+          UI::TableNextColumn();
+          SetMinWidth(deltaWidth);
+          UI::Text("STM Delta");
+        }
+#endif
+      }  // end header
 
       uint minNum =
           Math::Min(bestTimesRec.Length, Math::Abs(numCheckpointsOnScreen));
       uint offset = 0;
-      bool cycleThoughCheckpoints = isFinished || !hasPlayerRaced;
+      bool cycleThoughCheckpoints = false;  // isFinished || !hasPlayerRaced;
+
+      int test = currCP;
 
       if (minNum < bestTimesRec.Length) {
-        if (currCP > int(minNum) / 2) {
-          offset = currCP - minNum / 2;
+        if (test > int(minNum) / 2) {
+          offset = test - minNum / 2;
         }
 
-        if (currCP + minNum > int(bestTimesRec.Length) + 1 &&
+        if (test + minNum - 1 > int(bestTimesRec.Length) &&
             (!isMultiLap || isFinished)) {
           offset = int(bestTimesRec.Length) - minNum;
         }
@@ -1783,6 +1810,7 @@ void Render() {
                                currTimesRec[i].speedAverage);
           }
         }
+
         PushPBColor();
         if (showPBAverageSpeed) {
           UI::TableNextColumn();
@@ -1799,11 +1827,20 @@ void Render() {
         }
         PopPBColor();
 
+#if false
+        if (showSTMcomparison) {
+          UI::TableNextColumn();
+          if (STMRecords[0].trackTimes.Length > i && currTimesRec.Length > i) {
+            DrawDeltaText(currTimesRec[i].time - STMRecords[0].trackTimes[i]);
+          }
+        }
+#endif
+
         if (isRenderingCurrentCheckpoint) {
           UI::PopStyleColor();
           isRenderingCurrentCheckpoint = false;
         }
-      }
+      }  // end cp data
 
       UI::EndTable();
     }
