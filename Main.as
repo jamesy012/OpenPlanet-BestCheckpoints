@@ -35,7 +35,7 @@ class Record {
     this.speedAverage = speedAverage;
   }
 
-  Record @opAssign(const Record& in record) {
+  Record @opAssign(const Record &in record) {
     checkpointId = record.checkpointId;
     time = record.time;
     speed = record.speed;
@@ -208,6 +208,15 @@ void Update(float dt) {
 
       UpdateWaypoints();
     }
+
+#if TURBO
+    UpdateSTMRecordIndex();
+    if(STMRecordIndex != -1){
+      STMRecords[STMRecordIndex].PrepareForLapCount(isMultiLap ? numLaps : 1);
+      DebugText(""+ STMRecords[STMRecordIndex].trackTimes.Length );
+      DebugText(""+ numCps);
+    }
+#endif
   }
   // wait for the car to be back at starting checkpoint
   if (waitForCarReset) {
@@ -299,7 +308,7 @@ void Update(float dt) {
 #if TURBO || MP4
     DebugText(cp + " > " + numCps);
     if (hasFinishedMap == false && cp > numCps) {
-      numCps++;  // turbo Temp
+      numCps++; // turbo Temp
       DebugText("adding CP");
     }
 #endif
@@ -351,12 +360,12 @@ void Update(float dt) {
         if (pbTime == 0) {
           UpdatePersonalBestTimes();
         }
-      }  // race finish
-    }    // lap finish
+      } // race finish
+    }   // lap finish
 
     speedTracker.CheckpointReset();
 
-  }  // change cp
+  } // change cp
 }
 
 void CreateOrUpdateCurrentTime(int checkpoint, int time, int speed,
@@ -702,7 +711,7 @@ int GetUICheckpointTime() {
   }
   CGameManialinkControl @race_Checkpoint = linkPage.GetClassChildren_Result[0];
   if (race_Checkpoint is null ||
-      race_Checkpoint.ControlId != "Race_Checkpoint") {  // validation
+      race_Checkpoint.ControlId != "Race_Checkpoint") { // validation
     return -1;
   }
   CGameManialinkControl @frame_checkpoint =
@@ -855,7 +864,8 @@ bool IsWaypointValid(int index) {
   if (landmarks[index].Waypoint !is null ? landmarks[index].Waypoint.IsFinish
                                          : false)
     valid = true;
-  if ((landmarks[index].Tag == "Checkpoint")) valid = true;
+  if ((landmarks[index].Tag == "Checkpoint"))
+    valid = true;
   return valid;
 }
 
@@ -871,7 +881,7 @@ int GetSpawnCheckpoint() {
 void UpdateWaypoints() {
   // turbo gets from save file/during a run
 #if TMNEXT
-  numCps = 1;  // one for finish
+  numCps = 1; // one for finish
 #endif
   numLaps = 1;
   isMultiLap = false;
@@ -1067,7 +1077,7 @@ void LoadFile() {
           if (version == "1.0") {
             // 1.0 stored in seperate data, with no checkpoint index
             CreateOrUpdateBestTime(-1, jsonData[key], -1, -1);
-          } else {  // current
+          } else { // current
             int speed = 0;
             int pbSpeed = 0;
             int speedAverage = 0;
@@ -1216,6 +1226,11 @@ void Render() {
                              !isMultiLap;
   bool shouldShowPersonalBest = showPersonalBest && pbTime != 0;
   bool shouldShowLastLapDelta = isMultiLap && numLaps != 1;
+#if TURBO
+  bool shouldShowSTMcomparison =
+      (STMRecordIndex != -1) &&
+      STMRecords[STMRecordIndex].trackTimes.Length == uint(numCps);
+#endif
   // number of cols we show checkpoint data for
   int dataCols = 0;
   dataCols += BoolToInt(showCheckpoints);
@@ -1244,8 +1259,12 @@ void Render() {
   dataCols += BoolToInt(showBestAverageSpeedDelta);
   dataCols += BoolToInt(showPBAverageSpeed);
   dataCols += BoolToInt(showPBAverageSpeedDelta);
-#if false
-  dataCols += BoolToInt(showSTMcomparison);
+#if TURBO
+  if (shouldShowSTMcomparison) {
+    dataCols += BoolToInt(showSTMcomparison);
+    dataCols += BoolToInt(showBestSTMcomparison);
+    dataCols += BoolToInt(showPBSTMcomparison);
+  }
 #endif
 
   bool isDisplayingSomething =
@@ -1576,19 +1595,31 @@ void Render() {
           UI::Text("A. PB. S. Delta");
         }
         PopPBColor();
-#if false
-        if (showSTMcomparison) {
-          UI::TableNextColumn();
-          SetMinWidth(deltaWidth);
-          UI::Text("STM Delta");
+#if TURBO
+        if (shouldShowSTMcomparison) {
+          if (showSTMcomparison) {
+            UI::TableNextColumn();
+            SetMinWidth(deltaWidth);
+            UI::Text("STM Delta");
+          }
+          if (showBestSTMcomparison) {
+            UI::TableNextColumn();
+            SetMinWidth(deltaWidth);
+            UI::Text("B.STM Delta");
+          }
+          if (showPBSTMcomparison) {
+            UI::TableNextColumn();
+            SetMinWidth(deltaWidth);
+            UI::Text("PB.STM Delta");
+          }
         }
 #endif
-      }  // end header
+      } // end header
 
       uint minNum =
           Math::Min(bestTimesRec.Length, Math::Abs(numCheckpointsOnScreen));
       uint offset = 0;
-      bool cycleThoughCheckpoints = false;  // isFinished || !hasPlayerRaced;
+      bool cycleThoughCheckpoints = false; // isFinished || !hasPlayerRaced;
 
       int test = currCP;
 
@@ -1827,11 +1858,31 @@ void Render() {
         }
         PopPBColor();
 
-#if false
-        if (showSTMcomparison) {
-          UI::TableNextColumn();
-          if (STMRecords[0].trackTimes.Length > i && currTimesRec.Length > i) {
-            DrawDeltaText(currTimesRec[i].time - STMRecords[0].trackTimes[i]);
+#if TURBO
+        if (shouldShowSTMcomparison) {
+          if (showSTMcomparison) {
+            UI::TableNextColumn();
+            if (STMRecords[STMRecordIndex].trackTimes.Length > i &&
+                currTimesRec.Length > i) {
+              DrawDeltaText(currTimesRec[i].time -
+                            STMRecords[STMRecordIndex].trackTimes[i]);
+            }
+          }
+          if (showBestSTMcomparison) {
+            UI::TableNextColumn();
+            if (STMRecords[STMRecordIndex].trackTimes.Length > i &&
+                bestTimesRec.Length > i) {
+              DrawDeltaText(bestTimesRec[i].time -
+                            STMRecords[STMRecordIndex].trackTimes[i]);
+            }
+          }
+          if (showPBSTMcomparison) {
+            UI::TableNextColumn();
+            if (STMRecords[STMRecordIndex].trackTimes.Length > i &&
+                pbTimesRec.Length > i) {
+              DrawDeltaText(pbTimesRec[i].time -
+                            STMRecords[STMRecordIndex].trackTimes[i]);
+            }
           }
         }
 #endif
@@ -1840,7 +1891,7 @@ void Render() {
           UI::PopStyleColor();
           isRenderingCurrentCheckpoint = false;
         }
-      }  // end cp data
+      } // end cp data
 
       UI::EndTable();
     }
@@ -1893,7 +1944,7 @@ void DrawDeltaText(int delta) {
   vec4 negDeltaLight;
   vec4 posDelta = vec4(1.0, 0.0, 0.0, 1.0);
   vec4 posDeltaLight = vec4(1.0, 0.4, 0.4, 1.0);
-  if (shouldDeltaBeBlue) {  // why does blue look so shit?
+  if (shouldDeltaBeBlue) { // why does blue look so shit?
     negDelta = vec4(0.4, 0.4, 1.0, 1.0);
     negDeltaLight = vec4(0.5, 0.5, 1.0, 1.0);
     // negDelta = negDeltaLight;
@@ -1933,7 +1984,7 @@ void DrawSpeedDeltaText(int delta) {
   vec4 negDeltaLight;
   vec4 posDelta = vec4(1.0, 0.0, 0.0, 1.0);
   vec4 posDeltaLight = vec4(1.0, 0.4, 0.4, 1.0);
-  if (shouldDeltaBeBlue) {  // why does blue look so shit?
+  if (shouldDeltaBeBlue) { // why does blue look so shit?
     negDelta = vec4(0.4, 0.4, 1.0, 1.0);
     negDeltaLight = vec4(0.5, 0.5, 1.0, 1.0);
     // negDelta = negDeltaLight;
@@ -1967,7 +2018,7 @@ bool isCurrentCPValid(uint index) {
 }
 
 int getCurrentCPTime(int index) {
-  if (isCurrentCPValid(index)) {  // useless check?
+  if (isCurrentCPValid(index)) { // useless check?
     if (shouldCompareToCurrentLap) {
       return currLapTimesRec[index].time;
     } else {

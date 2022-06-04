@@ -1,5 +1,8 @@
 //visual studio code formatting messes with the [Setting ..] text causing open planet to crash
 //moved to different file to get around that issue
+#if __INTELLISENSE__
+#include "cppIntellisense.h"
+#endif
 
 [Setting category="Display Settings" name="Window visible" description="To adjust the position of the window, click and drag while the Openplanet overlay is visible."]
 bool windowVisible = true;
@@ -156,10 +159,14 @@ bool showPBAverageSpeed = false;
 [Setting category="Window Options speed" name="Show PB to current average speed Delta" description="shows Delta between last PB average speed and current average speed"]
 bool showPBAverageSpeedDelta = false;
 
-#if false
+#if TURBO
 // ---------------- comparison settings ------------
-[Setting category="STM comparison" name="showSTMcomparison" description="showSTMcomparison"]
+[Setting category="STM comparison" name="Show current to STM comparison" description="Displays the delta for the STM time to your current run"]
 bool showSTMcomparison = true;
+[Setting category="STM comparison" name="Show Best to STM comparison" description="Displays the delta for the STM time to your best times run"]
+bool showBestSTMcomparison = true;
+[Setting category="STM comparison" name="Show BP to STM comparison" description="Displays the delta for the STM time to your stored personal best"]
+bool showPBSTMcomparison = true;
 #endif
 
 // ---------------- JSON Data settings ------------
