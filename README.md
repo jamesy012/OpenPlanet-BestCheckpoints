@@ -18,6 +18,20 @@ Saves your best times to load whenever you come back to the map
 
 # Updates
 
+## 1.6
+
+STM time comparison Turbo
+
+changing how font is loaded to remove deperated function call
+
+issue with the TOTD July 6th multilap map
+
+    not overally fixed the map is quite odd but it no longer crashes
+
+##### 1.5.2
+
+fixing the save on any run, that wasnt working for a while now
+
 ##### 1.5.1
 
 Added Average speed
