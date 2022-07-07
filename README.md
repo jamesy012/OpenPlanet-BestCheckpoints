@@ -18,11 +18,15 @@ Saves your best times to load whenever you come back to the map
 
 # Updates
 
+##### 1.6.1
+
+font is not deprecated on TURBO and MANIA
+
 ## 1.6
 
 STM time comparison Turbo
 
-changing how font is loaded to remove deperated function call
+changing how font is loaded to remove deprecated function call
 
 issue with the TOTD July 6th multilap map
 

@@ -109,7 +109,11 @@ bool isFinished = false;
 // font
 string loadedFontFace = "";
 int loadedFontSize = 0;
+#if NEXT
 UI::Font @font = null;
+#else
+Resources::Font @font = null;
+#endif
 
 // file io
 string jsonFile = '';
@@ -501,7 +505,7 @@ void UpdateSaveBestData() {
 
   if (save) {
     // update our best times
-    for (uint i = 0; i < Math::Min(currTimesRec.Length, bestTimesRec.Length); i++) {
+    for (int i = 0; i < Math::Min(currTimesRec.Length, bestTimesRec.Length); i++) {
       if (currTimesRec[i].time < bestTimesRec[i].time) {
         bestTimesRec[i].time = currTimesRec[i].time;
       }
@@ -2037,7 +2041,11 @@ void SetMinWidth(int width) {
 void LoadFont() {
   string fontFaceToLoad = fontFace.Length == 0 ? "DroidSans.ttf" : fontFace;
   if (fontFaceToLoad != loadedFontFace || fontSize != loadedFontSize) {
+#if NEXT
     @font = UI::LoadFont(fontFaceToLoad, fontSize);
+#else
+    @font = Resources::GetFont(fontFaceToLoad, fontSize);
+#endif
     if (font !is null) {
       loadedFontFace = fontFaceToLoad;
       loadedFontSize = fontSize;
