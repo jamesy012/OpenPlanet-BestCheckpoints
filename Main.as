@@ -109,7 +109,7 @@ bool isFinished = false;
 // font
 string loadedFontFace = "";
 int loadedFontSize = 0;
-#if NEXT
+#if TMNEXT
 UI::Font @font = null;
 #else
 Resources::Font @font = null;
@@ -129,7 +129,7 @@ bool hasFinishedMap = false;
 int turboCheckpointCounter = 0;
 uint lastCurrCheckpointRaceTime = uint(-1);
 
-void DebugText(string text) {
+void DebugText(const string &in text) {
   if (enableLogging) {
     print(text);
   }
@@ -750,7 +750,7 @@ int GetUICheckpointTime() {
 }
 #endif
 
-int ConvertStringToTime(string input) {
+int ConvertStringToTime(const string &in input) {
   string[] seconds = SplitString(input, ":");
   if (seconds.Length != 2) {
     return -1;
@@ -771,7 +771,7 @@ int ConvertStringToTime(string input) {
 }
 
 // splits strings, removes split character
-string[] SplitString(string input, string split) {
+string[] SplitString(const string &in input, const string &in split) {
   // how to just pass a char??
   string current = "";
   string[] output;
@@ -2041,7 +2041,7 @@ void SetMinWidth(int width) {
 void LoadFont() {
   string fontFaceToLoad = fontFace.Length == 0 ? "DroidSans.ttf" : fontFace;
   if (fontFaceToLoad != loadedFontFace || fontSize != loadedFontSize) {
-#if NEXT
+#if TMNEXT
     @font = UI::LoadFont(fontFaceToLoad, fontSize);
 #else
     @font = Resources::GetFont(fontFaceToLoad, fontSize);

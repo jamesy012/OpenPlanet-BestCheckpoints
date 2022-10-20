@@ -2,8 +2,5 @@
 name     = "Best Checkpoints"
 author   = "MostlyADuck"
 category = "Race"
-version = "1.6.1"
+version = "1.6.2"
 siteid = 170
-
-[script]
-imports = [ "Formatting.as", "Time.as" ]
